@@ -270,9 +270,8 @@ if args.mode == 'train':
         plt.show()
         fig.savefig(path + '.png')
         fig.savefig(path + '.pdf')
-
     except ValueError:
-        print("Plot validation auroc wrong")
+        print("Error in Plotting validation auroc values over epochs")
 
 
 elif args.mode == 'test':
@@ -314,7 +313,7 @@ elif args.mode == 'test':
     print(test_results)
     # path = os.path.join(args.output_dir, "test_predictions", os.path.basename(args.load_state)) + ".csv"
     path = os.path.join("test_predictions", os.path.basename(args.load_state)) + ".csv"
-    utils.save_results(names, predictions, labels, path)
+    utils.save_results(names, predictions, true_labels, path)
     h_, m_, s_ = TimeReport._hms(time.time() - start_time)
     print('Testing elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))
 
