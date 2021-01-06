@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 import torch.nn.functional as F
 # from wrappers import TimeDistributed
 from mimic3models.pytorch_models.torch_utils import TimeDistributed
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, PackedSequence
 
 
 def predict_labels(input):
@@ -28,12 +29,18 @@ def predict_labels(input):
     return p, labels
 
 
+def squash_packed_iid(x, fn):
+    """
+    Applying fn to each element of x i.i.i
+    x is torch.nn.utils.rnn.PackedSequence
+    """
+    return PackedSequence(fn(x.data), x.batch_sizes,
+                 x.sorted_indices, x.unsorted_indices)
+
+
 class LSTM_PT(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers=2, num_classes=2,
-                 dropout=0.3, target_repl=False, deep_supervision=False, **kwargs):
-        # __init__(self, hidden_dim, batch_norm, dropout, rec_dropout, task,
-        #          target_repl=False, deep_supervision=False, num_classes=2,
-        #          depth=1, input_dim=76, **kwargs):
+                 dropout=0.3, target_repl=False, deep_supervision=False, task='ihm', **kwargs):
         super(LSTM_PT, self).__init__()
 
         print("==> not used params in network class:", kwargs.keys())
@@ -42,21 +49,16 @@ class LSTM_PT(nn.Module):
         self.num_layers = num_layers  # using 2 here
         self.num_classes = num_classes  # 2, for binary classification using (softmax + ) cross entropy
         self.dropout = dropout  # 0.3
-        # self.rec_dropout = rec_dropout # rec_dropout=0.0, No recurrent dropout in Pytorch
 
-
-        # if task in ['decomp', 'ihm', 'ph']:
-        #     final_activation = 'sigmoid'
-        #     self.final_activation = nn.Sigmoid
-        # elif task in ['los']:
-        #     if num_classes == 1:
-        #         final_activation = 'relu'
-        #         self.final_activation = nn.ReLU
-        #     else:
-        #         final_activation = 'softmax'
-        #         self.final_activation = nn.Softmax
-        # else:
-        #     raise ValueError("Wrong value for task")
+        if task in ['decomp', 'ihm', 'ph']:
+            self.final_activation = nn.Sigmoid()
+        elif task in ['los']:
+            if num_classes == 1:
+                self.final_activation = nn.ReLU()
+            else:
+                self.final_activation = nn.Softmax()
+        else:
+            raise ValueError("Wrong value for task")
 
 
         # Input layers and masking
@@ -147,24 +149,43 @@ class LSTM_PT(nn.Module):
         for t in b:
             nn.init.constant_(t, 0)
 
-    def forward(self, x, is_return_representation=False):
+    def forward(self, x):
         # add masking, padded sequence?
-        x = self.input_dropout_layer(x)  # (bs, seq=48, dim=76)
+        if isinstance(x, PackedSequence):
+            x = squash_packed_iid(x, self.input_dropout_layer)
+        else:
+            x = self.input_dropout_layer(x)  # (bs, seq=48, dim=76)
+
         if self.num_layers > 1:
             x, (hn, cn) = self.main_lstm_layer(x)  # (bs, seq=48, dim=16), hn, cn (num_layers * num_directions=2, batch, hidden_size = 8) add h0, c0 in the initilization
-            x = self.inner_dropout_layer(x)  # (bs, seq=48, dim=16)
+            if isinstance(x, PackedSequence):
+                x = squash_packed_iid(x, self.inner_dropout_layer)
+            else:
+                x = self.inner_dropout_layer(x)  # (bs, seq=48, dim=16)
             x, (hn, cn) = self.output_lstm_layer(x)  # (bs, seq=48, hidden_dim=16), hn,cn (1, bs, hidden_dim=16)
         else:
             x, (hn, cn) = self.output_lstm_layer(x)  # initilization
 
-        x = self.output_dropout_layer(x)
+        #
+        if isinstance(x, PackedSequence):
+            x, lens_unpacked = pad_packed_sequence(x, batch_first=True)
+            indices = lens_unpacked - 1
+            last_time_step = torch.gather(x, 1,
+                                          indices.view(-1, 1).unsqueeze(2).repeat(1, 1, x.shape[2]).to(device=x.device))
+            last_time_step = last_time_step.squeeze()
+        else:
+            last_time_step = x[:, -1, :]  # (bs, hidden_dim=16) lstm_out[:,-1,:] for batch first or h_n[-1,:,:]
 
-        last_time_step = x[:, -1, :]  # (bs, hidden_dim=16) lstm_out[:,-1,:] for batch first or h_n[-1,:,:]
+        last_time_step = self.output_dropout_layer(last_time_step)
+        representation = F.normalize(last_time_step, dim=1)
+        # out = self.output_linear(representation)
         out = self.output_linear(last_time_step)  # (bs, 2)
+        # out = self.head(last_time_step)
+        # representation = F.normalize(out, dim=1)
         # No softmax activation if for pytorch crossentropy loss
         # original used in keras. should use sigmoid activation before keras binary cross entropy loss
-        # y_pred = self.final_activation(y_pred)
-        return (out, last_time_step) if is_return_representation else out
+        out = self.final_activation(out)
+        return out, representation
 
     def say_name(self):
         return "{}.i{}.h{}.L{}.c{}{}".format('LSTM_PT',
@@ -175,6 +196,210 @@ class LSTM_PT(nn.Module):
                                                ".D{}".format(self.dropout) if self.dropout > 0 else "-"
                                                )
 
+#
+# class LSTM_PT(nn.Module):
+#     def __init__(self, input_dim, hidden_dim, num_layers=2, num_classes=2,
+#                  dropout=0.3, target_repl=False, deep_supervision=False, **kwargs):
+#         # __init__(self, hidden_dim, batch_norm, dropout, rec_dropout, task,
+#         #          target_repl=False, deep_supervision=False, num_classes=2,
+#         #          depth=1, input_dim=76, **kwargs):
+#         super(LSTM_PT, self).__init__()
+#
+#         print("==> not used params in network class:", kwargs.keys())
+#         self.input_dim = input_dim  # 76
+#         self.hidden_dim = hidden_dim  # 16
+#         self.num_layers = num_layers  # using 2 here
+#         self.num_classes = num_classes  # 2, for binary classification using (softmax + ) cross entropy
+#         self.dropout = dropout  # 0.3
+#         # self.rec_dropout = rec_dropout # rec_dropout=0.0, No recurrent dropout in Pytorch
+#
+#
+#         # if task in ['decomp', 'ihm', 'ph']:
+#         #     final_activation = 'sigmoid'
+#         #     self.final_activation = nn.Sigmoid
+#         # elif task in ['los']:
+#         #     if num_classes == 1:
+#         #         final_activation = 'relu'
+#         #         self.final_activation = nn.ReLU
+#         #     else:
+#         #         final_activation = 'softmax'
+#         #         self.final_activation = nn.Softmax
+#         # else:
+#         #     raise ValueError("Wrong value for task")
+#
+#
+#         # Input layers and masking
+#         # X = Input(shape=(None, input_dim), name='X')
+#         # inputs = [X]
+#         # mX = Masking()(X)
+#         #
+#         # if deep_supervision:
+#         #     M = Input(shape=(None,), name='M')
+#         #     inputs.append(M)
+#
+#         # Configurations
+#         self.bidirectional = True  # default bidirectional for the LSTM layer except output LSTM layer
+#         if deep_supervision:
+#             self.bidirectional = False
+#
+#         # Main part of the network - pytorch
+#         self.input_dropout_layer = nn.Dropout(p=self.dropout)
+#
+#         num_hidden_dim = self.hidden_dim
+#         if self.bidirectional:
+#             num_hidden_dim = num_hidden_dim // 2
+#
+#         if self.num_layers > 1:
+#             self.main_lstm_layer = nn.LSTM(
+#                 input_size=self.input_dim,  # 76
+#                 hidden_size=num_hidden_dim,  # 8
+#                 batch_first=True,  # X should be:  (batch, seq, feature)
+#                 dropout=self.dropout,  # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
+#                 num_layers=self.num_layers - 1,
+#                 bidirectional=self.bidirectional)
+#             num_input_dim = self.hidden_dim  # for output lstm layer
+#         else:
+#             num_input_dim = self.input_dim  # for output lstm layer
+#
+#         self.inner_dropout_layer = nn.Dropout(p=self.dropout)
+#         # Output module of the network - Pytorch
+#         # output lstm is not bidirectional. So, what if num_layers = 1, then, is_bidirectional is useless.
+#         # return_sequences = (target_repl or deep_supervision) # always return sequence in pytorch
+#         # Should I add input dropout layer here?
+#         self.output_lstm_layer = nn.LSTM(
+#             input_size=num_input_dim,  # output 1 layer
+#             hidden_size=self.hidden_dim,
+#             batch_first=True,  # X should be:  (batch, seq, feature)
+#             # dropout=self.dropout, # only one layer, no need for inner dropout
+#             num_layers=1,  # output 1 layer
+#             bidirectional=False)  # output one direction for the output layer
+#
+#         self.output_dropout_layer = nn.Dropout(p=self.dropout)
+#
+#         if target_repl:
+#             # y = TimeDistributed(Dense(num_classes, activation=final_activation),
+#             #                     name='seq')(L)
+#             # y_last = LastTimestep(name='single')(y)
+#             # outputs = [y_last, y]
+#             raise NotImplementedError
+#         elif deep_supervision:
+#             # y = TimeDistributed(Dense(num_classes, activation=final_activation))(L)
+#             # y = ExtendMask()([y, M])  # this way we extend mask of y to M
+#             # outputs = [y]
+#             raise NotImplementedError
+#         else:
+#             # Only use last output.
+#             # y = Dense(num_classes, activation=final_activation)(L)
+#             # outputs = [y]
+#             self.output_linear = nn.Linear(self.hidden_dim, self.num_classes)
+#             self.head = nn.Sequential(
+#                 nn.Linear(self.hidden_dim, self.hidden_dim),
+#                 nn.ReLU(inplace=True),
+#                 nn.Linear(self.hidden_dim, self.hidden_dim)
+#             )
+#
+#         self.reset_parameters()
+#         # taking care of initialization problem later
+#         # self.hidden = (
+#         #     torch.randn(self.num_layers * (2 ** int(self.bidirectional)), self.batch_size, self.hidden_dims[0]).to(
+#         #         self.device),
+#         #     torch.randn(self.num_layers * (2 ** int(self.bidirectional)), self.batch_size, self.hidden_dims[0]).to(
+#         #         self.device)
+#         # )
+#
+#     def reset_parameters(self):
+#         """
+#         Here we reproduce Keras default initialization weights to initialize Embeddings/LSTM weights
+#         """
+#         ih = (param.data for name, param in self.named_parameters() if 'weight_ih' in name)
+#         hh = (param.data for name, param in self.named_parameters() if 'weight_hh' in name)
+#         b = (param.data for name, param in self.named_parameters() if 'bias' in name)
+#         for t in ih:
+#             nn.init.xavier_uniform_(t)
+#         for t in hh:
+#             nn.init.orthogonal_(t)
+#         for t in b:
+#             nn.init.constant_(t, 0)
+#
+#     def encoder(self, x):
+#         # add masking, padded sequence?
+#         x = self.input_dropout_layer(x)  # (bs, seq=48, dim=76)
+#         if self.num_layers > 1:
+#             x, (hn, cn) = self.main_lstm_layer(
+#                 x)  # (bs, seq=48, dim=16), hn, cn (num_layers * num_directions=2, batch, hidden_size = 8) add h0, c0 in the initilization
+#             x = self.inner_dropout_layer(x)  # (bs, seq=48, dim=16)
+#             x, (hn, cn) = self.output_lstm_layer(x)  # (bs, seq=48, hidden_dim=16), hn,cn (1, bs, hidden_dim=16)
+#         else:
+#             x, (hn, cn) = self.output_lstm_layer(x)  # initilization
+#
+#         x = self.output_dropout_layer(x)
+#
+#         last_time_step = x[:, -1, :]  # (bs, hidden_dim=16) lstm_out[:,-1,:] for batch first or h_n[-1,:,:]
+#         return last_time_step
+#
+#     def forward_contrastive_pretrain(self, x):
+#         feat = self.encoder(x)
+#         feat = self.head(feat)
+#         feat = F.normalize(feat, dim=1)
+#         return feat
+#
+#     def forward_fine_tune(self, x, isFineTune=True):
+#         if isFineTune:
+#             with torch.no_grad():
+#                 self.eval()
+#                 feat = self.encoder(x)
+#                 self.train()
+#             output = self.output_linear(feat)
+#         else:
+#             feat = self.encoder(x)
+#             output = self.output_linear(feat)
+#         return output
+#
+#     def forward(self, x, is_return_representation=False):
+#         last_time_step = self.encoder(x)  # x[:, -1, :]  # (bs, hidden_dim=16) lstm_out[:,-1,:] for batch first or h_n[-1,:,:]
+#         representation = F.normalize(last_time_step, dim=1)
+#         # out = self.output_linear(representation)
+#         out = self.output_linear(last_time_step)  # (bs, 2)
+#         # out = self.head(last_time_step)
+#         # representation = F.normalize(out, dim=1)
+#         # No softmax activation if for pytorch crossentropy loss
+#         # original used in keras. should use sigmoid activation before keras binary cross entropy loss
+#         # y_pred = self.final_activation(y_pred)
+#         return (out, representation) if is_return_representation else out
+#
+#
+#     # def forward(self, x, is_return_representation=False):
+#     #     # add masking, padded sequence?
+#     #     x = self.input_dropout_layer(x)  # (bs, seq=48, dim=76)
+#     #     if self.num_layers > 1:
+#     #         x, (hn, cn) = self.main_lstm_layer(x)  # (bs, seq=48, dim=16), hn, cn (num_layers * num_directions=2, batch, hidden_size = 8) add h0, c0 in the initilization
+#     #         x = self.inner_dropout_layer(x)  # (bs, seq=48, dim=16)
+#     #         x, (hn, cn) = self.output_lstm_layer(x)  # (bs, seq=48, hidden_dim=16), hn,cn (1, bs, hidden_dim=16)
+#     #     else:
+#     #         x, (hn, cn) = self.output_lstm_layer(x)  # initilization
+#     #
+#     #     x = self.output_dropout_layer(x)
+#     #
+#     #     last_time_step = x[:, -1, :]  # (bs, hidden_dim=16) lstm_out[:,-1,:] for batch first or h_n[-1,:,:]
+#     #     representation = F.normalize(last_time_step, dim=1)
+#     #     # out = self.output_linear(representation)
+#     #     out = self.output_linear(last_time_step)  # (bs, 2)
+#     #     # out = self.head(last_time_step)
+#     #     # representation = F.normalize(out, dim=1)
+#     #     # No softmax activation if for pytorch crossentropy loss
+#     #     # original used in keras. should use sigmoid activation before keras binary cross entropy loss
+#     #     # y_pred = self.final_activation(y_pred)
+#     #     return (out, representation) if is_return_representation else out
+#
+#     def say_name(self):
+#         return "{}.i{}.h{}.L{}.c{}{}".format('LSTM_PT',
+#                                                self.input_dim,
+#                                                self.hidden_dim,
+#                                                self.num_layers,
+#                                                self.num_classes,
+#                                                ".D{}".format(self.dropout) if self.dropout > 0 else "-"
+#                                                )
+#
 
 class LSTM_PT_Demo(nn.Module):
     def __init__(self, n_features=25, hidden_dims=[80, 80], seq_length=250, batch_size=64, n_predictions=1,

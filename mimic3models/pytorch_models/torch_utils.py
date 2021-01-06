@@ -1,5 +1,6 @@
 import torch.nn as nn
-
+import torch
+import torch.nn.functional as F
 
 def model_summary(model):
     print("=" * 50)
@@ -21,6 +22,7 @@ def model_summary(model):
     print('Total trainable parameters: ', pytorch_total_trainable_params)
     print("=" * 50)
     return table, total_params
+
 
 class TimeDistributed(nn.Module):
     """
@@ -54,3 +56,42 @@ class TimeDistributed(nn.Module):
             y = y.view(-1, x.size(1), y.size(-1))  # (timesteps, samples, output_size)
 
         return y
+
+
+def shuffle_within_labels(x, y):
+    unique_class = y.unique()
+    id_list = []
+    shuffle_list = []
+    sfx = x.clone()  # .detach().clone()
+    for v in unique_class:
+        vid = torch.nonzero(y==v, as_tuple=True)[0]
+        id_list.append(vid)
+        vs = torch.randperm(vid.size()[0])
+        shuffle_list.append(vid[vs])
+    id_list = torch.cat(id_list)
+    shuffle_list = torch.cat(shuffle_list)
+    sfx[id_list] = sfx[shuffle_list]
+    return sfx
+
+
+def shuffle_time_dim(x):
+    # x has shape (bs, T, dim)
+    # shuffle T dimension for each data in this batch
+    T = x.shape[1]
+    ridx = torch.randperm(T)
+    return x[:,ridx, :]
+
+
+def optimizer_to(optim, device):
+    for param in optim.state.values():
+        # Not sure there are any global tensors in the state dict
+        if isinstance(param, torch.Tensor):
+            param.data = param.data.to(device)
+            if param._grad is not None:
+                param._grad.data = param._grad.data.to(device)
+        elif isinstance(param, dict):
+            for subparam in param.values():
+                if isinstance(subparam, torch.Tensor):
+                    subparam.data = subparam.data.to(device)
+                    if subparam._grad is not None:
+                        subparam._grad.data = subparam._grad.data.to(device)

@@ -31,3 +31,11 @@ def save_results(names, pred, y_true, path):
         for (name, x, y) in zip(names, pred, y_true):
             f.write("{},{:.6f},{}\n".format(name, x, y))
 
+
+def random_add_positive_samples(x, y, number_to_add):
+    # x, y are np.array
+    index_of_pos = np.nonzero(y)[0]
+    index_to_add = np.random.choice(index_of_pos, number_to_add)
+    xx = np.append(x, x[index_to_add], axis=0)
+    yy = np.append(y, np.ones(number_to_add), axis=0)
+    return xx, yy

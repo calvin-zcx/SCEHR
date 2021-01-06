@@ -69,6 +69,32 @@ def sort_and_shuffle(data, batch_size):
     return data
 
 
+def sort_tuple_list(data, reverse=True):
+    """ Newly added by Chengxi Zang, 2021/1/4, possible wrong in sort_and_shuffle for two shuffles
+    sort data by the length
+        data is tuple (X1, X2, ..., Xn) all of them have the same length.
+        Usually data = (X, y).
+    """
+    assert len(data) >= 2
+    data = list(zip(*data))
+    data.sort(key=(lambda x: x[0].shape[0]), reverse=reverse)
+    data = list(zip(*data))
+    return data
+
+
+def shuffle_tuple_list(data):
+    """ Newly added by Chengxi Zang, 2021/1/4, possible wrong in sort_and_shuffle for two shuffles
+        shuffle data by the length.
+            data is tuple (X1, X2, ..., Xn) all of them have the same length.
+            Usually data = (X, y).
+        """
+    assert len(data) >= 2
+    data = list(zip(*data))
+    random.shuffle(data)
+    data = list(zip(*data))
+    return data
+
+
 def add_common_arguments(parser):
     """ Add all the parameters which are common across the tasks
     """
