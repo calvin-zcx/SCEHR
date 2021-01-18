@@ -1,6 +1,21 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
+from torch.utils import data
+
+
+class Dataset(data.Dataset):
+    def __init__(self, x, y, name):
+        self.x = x
+        self.y = y
+        self.name = name
+
+    def __getitem__(self, index):
+        return self.x[index], self.y[index], self.name[index]
+
+    def __len__(self):
+        return len(self.x)
+
 
 def model_summary(model):
     print("=" * 50)

@@ -15,7 +15,6 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, Packed
 
 
 def predict_labels(input):
-
     """
     Args:
         input: N_samples * C_classes. The input is expected to contain raw, unnormalized scores for each class.
@@ -35,12 +34,12 @@ def squash_packed_iid(x, fn):
     x is torch.nn.utils.rnn.PackedSequence
     """
     return PackedSequence(fn(x.data), x.batch_sizes,
-                 x.sorted_indices, x.unsorted_indices)
+                          x.sorted_indices, x.unsorted_indices)
 
 
 class LSTM_PT(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers=2, num_classes=2,
-                 dropout=0.3, target_repl=False, deep_supervision=False, task='ihm', **kwargs):
+                 dropout=0.3, target_repl=False, deep_supervision=False, task='ihm', final_act=None, **kwargs):
         super(LSTM_PT, self).__init__()
 
         print("==> not used params in network class:", kwargs.keys())
@@ -50,16 +49,19 @@ class LSTM_PT(nn.Module):
         self.num_classes = num_classes  # 2, for binary classification using (softmax + ) cross entropy
         self.dropout = dropout  # 0.3
 
-        if task in ['decomp', 'ihm', 'ph']:
-            self.final_activation = nn.Sigmoid()
-        elif task in ['los']:
-            if num_classes == 1:
-                self.final_activation = nn.ReLU()
+        if final_act == None:
+            # Set default activation
+            if task in ['decomp', 'ihm', 'ph']:
+                self.final_activation = nn.Sigmoid()
+            elif task in ['los']:
+                if num_classes == 1:
+                    self.final_activation = nn.ReLU()
+                else:
+                    self.final_activation = nn.Softmax()
             else:
-                self.final_activation = nn.Softmax()
+                raise ValueError("Wrong value for task")
         else:
-            raise ValueError("Wrong value for task")
-
+            self.final_activation = final_act
 
         # Input layers and masking
         # X = Input(shape=(None, input_dim), name='X')
@@ -87,7 +89,8 @@ class LSTM_PT(nn.Module):
                 input_size=self.input_dim,  # 76
                 hidden_size=num_hidden_dim,  # 8
                 batch_first=True,  # X should be:  (batch, seq, feature)
-                dropout=self.dropout,  # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
+                dropout=self.dropout,
+                # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
                 num_layers=self.num_layers - 1,
                 bidirectional=self.bidirectional)
             num_input_dim = self.hidden_dim  # for output lstm layer
@@ -124,7 +127,7 @@ class LSTM_PT(nn.Module):
             # Only use last output.
             # y = Dense(num_classes, activation=final_activation)(L)
             # outputs = [y]
-            self.output_linear = nn.Linear(self.hidden_dim, self.num_classes)
+            self.output_linear = nn.Linear(self.hidden_dim, self.num_classes)  # , bias=False
 
         self.reset_parameters()
         # taking care of initialization problem later
@@ -157,7 +160,8 @@ class LSTM_PT(nn.Module):
             x = self.input_dropout_layer(x)  # (bs, seq=48, dim=76)
 
         if self.num_layers > 1:
-            x, (hn, cn) = self.main_lstm_layer(x)  # (bs, seq=48, dim=16), hn, cn (num_layers * num_directions=2, batch, hidden_size = 8) add h0, c0 in the initilization
+            x, (hn, cn) = self.main_lstm_layer(
+                x)  # (bs, seq=48, dim=16), hn, cn (num_layers * num_directions=2, batch, hidden_size = 8) add h0, c0 in the initilization
             if isinstance(x, PackedSequence):
                 x = squash_packed_iid(x, self.inner_dropout_layer)
             else:
@@ -184,17 +188,18 @@ class LSTM_PT(nn.Module):
         # representation = F.normalize(out, dim=1)
         # No softmax activation if for pytorch crossentropy loss
         # original used in keras. should use sigmoid activation before keras binary cross entropy loss
-        out = self.final_activation(out)
+        out = self.final_activation(out).squeeze()
         return out, representation
 
     def say_name(self):
-        return "{}.i{}.h{}.L{}.c{}{}".format('LSTM_PT',
-                                               self.input_dim,
-                                               self.hidden_dim,
-                                               self.num_layers,
-                                               self.num_classes,
-                                               ".D{}".format(self.dropout) if self.dropout > 0 else "-"
-                                               )
+        return "{}.i{}.h{}.L{}.c{}{}".format('LSTM_',
+                                             self.input_dim,
+                                             self.hidden_dim,
+                                             self.num_layers,
+                                             self.num_classes,
+                                             ".D{}".format(self.dropout) if self.dropout > 0 else "-"
+                                             )
+
 
 #
 # class LSTM_PT(nn.Module):
@@ -403,7 +408,7 @@ class LSTM_PT(nn.Module):
 
 class LSTM_PT_Demo(nn.Module):
     def __init__(self, n_features=25, hidden_dims=[80, 80], seq_length=250, batch_size=64, n_predictions=1,
-                 device=torch.device("cpu"), dropout=0.3, bidirectional=False): #cuda:0
+                 device=torch.device("cpu"), dropout=0.3, bidirectional=False):  # cuda:0
         super(LSTM_PT_Demo, self).__init__()
 
         self.n_features = n_features
@@ -427,8 +432,10 @@ class LSTM_PT_Demo(nn.Module):
         self.linear = nn.Linear(self.hidden_dims[0], n_predictions)
 
         self.hidden = (
-            torch.randn(self.num_layers * (2**int(self.bidirectional)), self.batch_size, self.hidden_dims[0]).to(self.device),
-            torch.randn(self.num_layers * (2**int(self.bidirectional)), self.batch_size, self.hidden_dims[0]).to(self.device)
+            torch.randn(self.num_layers * (2 ** int(self.bidirectional)), self.batch_size, self.hidden_dims[0]).to(
+                self.device),
+            torch.randn(self.num_layers * (2 ** int(self.bidirectional)), self.batch_size, self.hidden_dims[0]).to(
+                self.device)
         )
 
     # def init_hidden_state(self):
@@ -546,11 +553,11 @@ if __name__ == "__main__":
     hidden_dim = 16
 
     X = torch.randn(bs, seq, input_dim)  # batch, seq_len,  input_size
-    h0 = torch.randn(2*num_layers, bs, hidden_dim)  # num_layers * num_directions, batch, hidden_size
-    c0 = torch.randn(2*num_layers, bs, hidden_dim)  # num_layers * num_directions, batch, hidden_size
+    h0 = torch.randn(2 * num_layers, bs, hidden_dim)  # num_layers * num_directions, batch, hidden_size
+    c0 = torch.randn(2 * num_layers, bs, hidden_dim)  # num_layers * num_directions, batch, hidden_size
 
     mylstm = LSTM_PT(input_dim, hidden_dim=hidden_dim, num_layers=num_layers, num_classes=2,
-                 dropout=0.3, target_repl=False, deep_supervision=False)
+                     dropout=0.3, target_repl=False, deep_supervision=False)
     # output: (seq_len, batch, num_directions * hidden_size)
     Y = mylstm(X)  # , (h0, c0)
     labels = predict_labels(Y)
@@ -569,7 +576,6 @@ if __name__ == "__main__":
     # c02 = torch.randn(2*2, 3, d)  # num_layers * num_directions, batch, hidden_size
     # # output: (seq_len, batch, num_directions * hidden_size)
     # output2, (hn2, cn2) = rnn2(input2, (h02, c02))  # (5,3,d*2) ((2*2, 3, d), (2*2, 3, d))
-
 
     # n = 19
     # f = LSTM_PT(n_features=25, hidden_dims=[80, 80], seq_length=250, batch_size=19, n_predictions=1,
@@ -599,5 +605,3 @@ if __name__ == "__main__":
     # inpt = torch.randn(3, 5) #, requires_grad=True)
     # target = torch.tensor([1, 0, 4])
     # output = loss(m(inpt), target)
-
-
