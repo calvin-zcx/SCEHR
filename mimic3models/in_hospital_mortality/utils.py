@@ -4,7 +4,7 @@ from __future__ import print_function
 from mimic3models import common_utils
 import numpy as np
 import os
-
+import itertools
 
 def load_data(reader, discretizer, normalizer, small_part=False, return_names=False):
     N = reader.get_number_of_examples()
@@ -39,3 +39,21 @@ def random_add_positive_samples(x, y, number_to_add):
     xx = np.append(x, x[index_to_add], axis=0)
     yy = np.append(y, np.ones(number_to_add), axis=0)
     return xx, yy
+
+
+def generate_grid_search_CBCE_cmd():
+    v_a = [0, 0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003, 0.0035, 0.004, 0.0045, 0.005]
+    v_bs = [64, 128, 256, 512, 1024]
+    v_decay = [0, 1e-5, 1e-4, 1e-3]
+    with open('CBCE.cmd', 'w') as f:
+        for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
+            # 2>&1 | tee log/MCE+SCL_hasstatic_a0_bs256_new.log"
+            cmd = "echo $LINENO && python main_CBCE.py --network lstm  " \
+                  "--dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --cuda --save_every 0 --epochs 100 " \
+                  "--coef_contra_loss {}  --batch_size {} --weight_decay {}\n".format(a, bs, decay)
+            f.write(cmd)
+
+
+if __name__ == "__main__":
+    # execute only if run as a script
+    generate_grid_search_CBCE_cmd()
