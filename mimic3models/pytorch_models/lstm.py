@@ -192,7 +192,7 @@ class LSTM_PT(nn.Module):
         return out, representation
 
     def say_name(self):
-        return "{}.i{}.h{}.L{}.c{}{}".format('LSTM_',
+        return "{}.i{}.h{}.L{}.c{}{}".format('LSTM',
                                              self.input_dim,
                                              self.hidden_dim,
                                              self.num_layers,

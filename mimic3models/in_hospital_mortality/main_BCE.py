@@ -160,13 +160,6 @@ if args.mode == 'train':
     val_raw = utils.load_data(val_reader, discretizer, normalizer, args.small_part, return_names=True)  # (3222,48,76), (3222,)
     test_raw = utils.load_data(test_reader, discretizer, normalizer, args.small_part, return_names=True)
 
-    # train_raw_torch = TensorDataset(torch.tensor(train_raw[0], dtype=torch.float32),
-    #                                 torch.tensor(train_raw[1], dtype=torch.float32))
-    # val_raw_torch = TensorDataset(torch.tensor(val_raw[0], dtype=torch.float32),
-    #                               torch.tensor(val_raw[1], dtype=torch.float32))
-    # test_raw_torch = TensorDataset(torch.tensor(test_raw[0], dtype=torch.float32),
-    #                                torch.tensor(test_raw[1], dtype=torch.long))
-
     train_dataset = Dataset(train_raw['data'][0], train_raw['data'][1], train_raw['names'])
     valid_dataset = Dataset(val_raw['data'][0], val_raw['data'][1], val_raw['names'])
     test_dataset = Dataset(test_raw['data'][0], test_raw['data'][1], test_raw['names'])
@@ -224,8 +217,8 @@ if args.mode == 'train':
                 X_batch_val = X_batch_val.float().to(device)
                 labels_batch_val = labels_batch_val.float().to(device)
                 y_hat_val, y_representation_val = model(X_batch_val)
-                # val_loss_batch = criterion(y_hat_val, labels_batch_val).item()
-                val_loss_batch = criterion_BCE(y_hat_val, labels_batch_val).item()
+                # val_loss_batch = criterion(y_hat_val, labels_batch_val)
+                val_loss_batch = criterion_BCE(y_hat_val, labels_batch_val)
                 if args.coef_contra_loss > 0:
                     y_representation_val = y_representation_val.unsqueeze(1)
                     val_loss_SCL = criterion_SCL(y_representation_val, labels_batch_val)
@@ -266,7 +259,6 @@ if args.mode == 'train':
             predicted_prob_test = torch.cat(predicted_prob_test, dim=0)
             true_labels_test = torch.cat(true_labels_test, dim=0)  # with threshold 0.5, not used here
 
-
             predictions_test = (predicted_prob_test.cpu().detach().numpy())
             true_labels_test = true_labels_test.cpu().detach().numpy()
             name_test = np.concatenate(name_test)
@@ -299,6 +291,11 @@ if args.mode == 'train':
             dirname = os.path.dirname(path)
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
+            test_details = {
+                'name': name_test,
+                'prediction': predictions_test,
+                'true_labels': true_labels_test
+            }
             torch.save({
                 'model_str': model.__str__(),
                 'args:': args,
@@ -308,15 +305,12 @@ if args.mode == 'train':
                 'training_losses': training_losses,
                 'validation_losses': validation_losses,
                 'validation_results': validation_results,
-                'test_results': test_results
+                'test_results': test_results,
+                'test_details': test_details,
             }, path+'.pt')
-            test_r = {
-                'name': name_test,
-                'prediction': predictions_test,
-                'true_labels': true_labels_test
-            }
-            pd_test = pd.DataFrame(data=test_r)  # , index=range(1, len(validation_results) + 1))
-            pd_test.to_csv(path + '_[TEST].csv')
+
+            # pd_test = pd.DataFrame(data=test_details)  # , index=range(1, len(validation_results) + 1))
+            # pd_test.to_csv(path + '_[TEST].csv')
 
     print('Training complete...')
     h_, m_, s_ = TimeReport._hms(time.time() - start_time)
@@ -351,49 +345,45 @@ elif args.mode == 'test':
     print('Beginning testing...')
     start_time = time.time()
     # ensure that the code uses test_reader
-    model.eval()
     model.to(torch.device('cpu'))
 
     del train_reader
     del val_reader
-    del test_reader
+    # del test_reader
+    # test_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'test'),
+    #                                         listfile=os.path.join(args.data, 'test_listfile.csv'),
+    #                                         period_length=48.0)
 
-    test_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'test'),
-                                            listfile=os.path.join(args.data, 'test_listfile.csv'),
-                                            period_length=48.0)
-    ret = utils.load_data(test_reader, discretizer, normalizer, args.small_part,
-                          return_names=True)
-    data = ret["data"][0]
-    labels = ret["data"][1]
-    names = ret["names"]
-    test_raw_torch = TensorDataset(torch.tensor(data, dtype=torch.float32),
-                                   torch.tensor(labels, dtype=torch.long))
-    test_loader = DataLoader(dataset=test_raw_torch, batch_size=args.batch_size, drop_last=False, shuffle=False)
+    ret = utils.load_data(test_reader, discretizer, normalizer, args.small_part, return_names=True)
+    test_dataset = Dataset(ret['data'][0], ret['data'][1], ret['names'])
+    test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, drop_last=False, shuffle=False)
 
     predicted_prob = []
     true_labels = []
+    names = []
     with torch.no_grad():
-        for X_batch, y_batch in tqdm(test_loader):
+        model.eval()
+        for X_batch, y_batch, name_batch in tqdm(test_loader):
+            X_batch = X_batch.float()
+            y_batch = y_batch.float()
             y_hat_batch, _ = model(X_batch)
-            # loss = criterion(y_hat, y_batch)
-            # p_batch, _ = predict_labels(y_hat_batch)
-            # predicted_prob.append(p_batch)
+
             predicted_prob.append(y_hat_batch)
             true_labels.append(y_batch)
+            names.append(name_batch)
+
         predicted_prob = torch.cat(predicted_prob, dim=0)
         true_labels = torch.cat(true_labels, dim=0) # with threshold 0.5, not used here
+        names = np.concatenate(names)
 
-    predictions = (predicted_prob.cpu().detach().numpy())
-    # predictions = predictions[:, 1] * (1-predictions[:, 0])
+    predictions = predicted_prob.cpu().detach().numpy()
     true_labels = true_labels.cpu().detach().numpy()
     test_results = metrics.print_metrics_binary(true_labels, predictions)
     print(test_results)
-    # path = os.path.join(args.output_dir, "test_predictions", os.path.basename(args.load_state)) + ".csv"
     path = os.path.join("test_predictions", os.path.basename(args.load_state)) + ".csv"
     utils.save_results(names, predictions, true_labels, path)
     h_, m_, s_ = TimeReport._hms(time.time() - start_time)
     print('Testing elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))
-
 else:
     raise ValueError("Wrong value for args.mode")
 
