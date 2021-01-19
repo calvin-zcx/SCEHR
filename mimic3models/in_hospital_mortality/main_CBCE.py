@@ -1,5 +1,8 @@
 from __future__ import absolute_import
 from __future__ import print_function
+import sys
+# for linux env.
+sys.path.insert(0, '../..')
 
 import numpy as np
 import argparse
