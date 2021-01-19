@@ -292,12 +292,12 @@ if args.mode == 'train':
                                    val_result['acc'], val_result['auroc'], val_result['auprc'],
                                    test_result['acc'], test_result['auroc'], test_result['auprc']))
         model_names.append(path + '.pt')
+        dirname = os.path.dirname(path)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
 
         if args.save_every and epoch % args.save_every == 0:
             # Set model checkpoint/saving path
-            dirname = os.path.dirname(path)
-            if not os.path.exists(dirname):
-                os.makedirs(dirname)
             test_details = {
                 'name': name_test,
                 'prediction': predictions_test,
