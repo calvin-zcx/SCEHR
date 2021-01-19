@@ -50,7 +50,8 @@ def generate_grid_search_CBCE_cmd():
             # 2>&1 | tee log/MCE+SCL_hasstatic_a0_bs256_new.log"
             cmd = "echo $LINENO && python main_CBCE.py --network lstm  " \
                   "--dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --cuda --save_every 0 --epochs 100 " \
-                  "--coef_contra_loss {}  --batch_size {} --weight_decay {}\n".format(a, bs, decay)
+                  "--coef_contra_loss {}  --batch_size {} --weight_decay {} " \
+                  "2>&1 | tee log/CBCE+SCL_bach_cmd_a{}.bs{}.weightDecay{}.log\n".format(a, bs, decay, a, bs, decay)
             f.write(cmd)
 
 
