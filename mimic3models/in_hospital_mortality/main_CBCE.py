@@ -53,6 +53,9 @@ print(args)
 
 # %%
 # Set the random seed manually for reproducibility.
+# https://pytorch.org/docs/stable/notes/randomness.html
+# https://pytorch.org/docs/stable/generated/torch.set_deterministic.html#torch.set_deterministic
+# https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html#torch.nn.LSTM
 np.random.seed(args.seed)
 random.seed(args.seed)
 
@@ -338,7 +341,7 @@ if args.mode == 'train':
     plt.ylim((0.82, 0.87))
     plt.show()
     fig.savefig(path + '.png')
-    fig.savefig(path + '.pdf')
+    # fig.savefig(path + '.pdf')
     r_all = {
         'model-name': model_names,
         'auroc-val': [x['auroc'] for x in validation_results],

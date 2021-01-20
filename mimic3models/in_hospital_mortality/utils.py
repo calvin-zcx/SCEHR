@@ -5,6 +5,9 @@ from mimic3models import common_utils
 import numpy as np
 import os
 import itertools
+import os
+import pandas as pd
+import re
 
 def load_data(reader, discretizer, normalizer, small_part=False, return_names=False):
     N = reader.get_number_of_examples()
@@ -55,6 +58,41 @@ def generate_grid_search_CBCE_cmd():
             f.write(cmd)
 
 
+def summarize_results_from_csv_files(dir):
+    # pytorch_states/CBCE/
+    f_list = list(filter(lambda x: '.csv' in x, os.listdir(dir)))
+    val = []
+    test = []
+    for f_name in f_list:
+        df = pd.read_csv(os.path.join(dir, f_name), index_col=0)
+        id_val = df['auroc-val'].idxmax()
+        id_test = df['auroc-test'].idxmax()
+        r_val = df.iloc[id_val,:].copy()
+        r_val['file-name'] = f_name
+        r_test = df.iloc[id_test, :].copy()
+        r_test['file-name'] = f_name
+        val.append(r_val)
+        test.append(r_test)
+
+    df_val = pd.DataFrame(val)
+    df_val = df_val.sort_values(by='auroc-val', ascending=False)
+    df_test = pd.DataFrame(test)
+    df_test = df_test.sort_values(by='auroc-test', ascending=False)
+    # if not os.path.exists(args.output_path):
+    #     os.makedirs(args.output_path)
+    last = list(filter(lambda a: a != '', re.split("\/", dir)))[-1]
+
+    fo = r'pytorch_states/'+last+'_summarize_results.xlsx'
+    with pd.ExcelWriter(fo) as writer:
+        df_test.to_excel(writer, sheet_name='test')
+        df_val.to_excel(writer, sheet_name='validation')
+    print('Dump ', fo, 'done!')
+
+
+def boostrap_interval_and_std():
+    pass
+
 if __name__ == "__main__":
     # execute only if run as a script
-    generate_grid_search_CBCE_cmd()
+    # generate_grid_search_CBCE_cmd()
+    summarize_results_from_csv_files(r'pytorch_states/CBCE_Linux/')
