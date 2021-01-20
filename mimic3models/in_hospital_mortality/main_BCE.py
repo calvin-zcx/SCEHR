@@ -206,8 +206,7 @@ if args.mode == 'train':
             optimizer.zero_grad()
             X_batch_train = X_batch_train.float().to(device)
             labels_batch_train = labels_batch_train.float().to(device)
-            bsz = labels_batch_train.shape[0]
-
+            # bsz = labels_batch_train.shape[0]
             y_hat_train, y_representation = model(X_batch_train)
             loss = get_loss(y_hat_train, labels_batch_train, y_representation, args.coef_contra_loss)
             loss.backward()
