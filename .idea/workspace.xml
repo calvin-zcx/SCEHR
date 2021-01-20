@@ -4,11 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="">
+    <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="no weight decay, more alpha">
+      <change afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/BCE.cmd" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/CBCE.cmd" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/CBCE.cmd" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -50,7 +48,7 @@
   <component name="ReaderModeSettings">
     <option name="enabled" value="false" />
   </component>
-  <component name="RunManager" selected="Python.utils">
+  <component name="RunManager" selected="Python.main_BCE">
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -210,7 +208,7 @@
       <workItem from="1609190346281" duration="10882000" />
       <workItem from="1609363799607" duration="232734000" />
       <workItem from="1610988306735" duration="65099000" />
-      <workItem from="1611162810485" duration="3048000" />
+      <workItem from="1611162810485" duration="3790000" />
     </task>
     <task id="LOCAL-00001" summary="not include pytorch states">
       <created>1608521605396</created>
@@ -324,7 +322,14 @@
       <option name="project" value="LOCAL" />
       <updated>1611164009894</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="no weight decay, more alpha">
+      <created>1611165891314</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1611165891314</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -358,7 +363,8 @@
     <MESSAGE value="# %%&#10;# Set the random seed manually for reproducibility.&#10;# https://pytorch.org/docs/stable/notes/randomness.html&#10;# https://pytorch.org/docs/stable/generated/torch.set_deterministic.html#torch.set_deterministic&#10;# https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html#torch.nn.LSTM&#10;np.random.seed(args.seed)&#10;random.seed(args.seed)&#10;&#10;torch.manual_seed(args.seed)  # cpu&#10;torch.cuda.manual_seed(args.seed)  # gpu&#10;torch.backends.cudnn.deterministic = True  # cudnn" />
     <MESSAGE value="get_loss, deal with small batch" />
     <MESSAGE value="re order name a, bs, decay" />
-    <option name="LAST_COMMIT_MESSAGE" value="re order name a, bs, decay" />
+    <MESSAGE value="no weight decay, more alpha" />
+    <option name="LAST_COMMIT_MESSAGE" value="no weight decay, more alpha" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

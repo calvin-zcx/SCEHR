@@ -61,6 +61,22 @@ def generate_grid_search_CBCE_cmd():
             f.write(cmd)
 
 
+def generate_grid_search_BCE_cmd():
+    v_a = [0, 0.0005, 0.001, 0.0015, 0.002,
+           0.0025, 0.003, 0.0035, 0.004, 0.0045,
+           0.005, 0.0055, 0.006, 0.0065, 0.007,
+           0.0075, 0.008, 0.0085, 0.009, 0.0095, 0.01]
+    v_bs = [64, 128, 256, 512, 1024]
+    v_decay = [0, ]  #, 1e-5, 1e-4, 1e-3]  try to fix the effect of weight decay
+    with open('BCE.cmd', 'w') as f:
+        for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
+            # 2>&1 | tee log/MCE+SCL_hasstatic_a0_bs256_new.log"
+            cmd = "python main_BCE.py --network lstm  " \
+                  "--dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --cuda --save_every 0 --epochs 100 " \
+                  "--coef_contra_loss {}  --batch_size {} --weight_decay {} " \
+                  "2>&1 | tee log_BCE/BCE+SCL_bach_cmd_a{}.bs{}.weDcy{}.log\n".format(a, bs, decay, a, bs, decay)
+            f.write(cmd)
+
 def summarize_results_from_csv_files(dir):
     # pytorch_states/CBCE/
     f_list = list(filter(lambda x: '.csv' in x, os.listdir(dir)))
@@ -98,5 +114,6 @@ def boostrap_interval_and_std():
 
 if __name__ == "__main__":
     # execute only if run as a script
-    generate_grid_search_CBCE_cmd()
+    # generate_grid_search_CBCE_cmd()
+    generate_grid_search_BCE_cmd()
     # summarize_results_from_csv_files(r'pytorch_states/CBCE_Linux/')
