@@ -6,7 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -47,7 +48,7 @@
   <component name="ReaderModeSettings">
     <option name="enabled" value="false" />
   </component>
-  <component name="RunManager" selected="Python.utils">
+  <component name="RunManager" selected="Python.main_CBCE">
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -122,7 +123,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" />
-      <option name="PARAMETERS" value="--network lstm  --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --batch_size 512 --coef_contra_loss 0.0025 --cuda --epochs 100 --weight_decay 1e-5" />
+      <option name="PARAMETERS" value="--network lstm  --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --batch_size 64 --coef_contra_loss 0.0025 --cuda --epochs 50 --weight_decay 1e-5" />
       <option name="SHOW_COMMAND_LINE" value="true" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -180,8 +181,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.utils" />
         <item itemvalue="Python.main_CBCE" />
+        <item itemvalue="Python.utils" />
         <item itemvalue="Python.main_BCE" />
         <item itemvalue="Python.main_BCEwithlogit" />
         <item itemvalue="Python.main_CBCE_old" />
@@ -203,7 +204,7 @@
       <workItem from="1608822321595" duration="6512000" />
       <workItem from="1609190346281" duration="10882000" />
       <workItem from="1609363799607" duration="232734000" />
-      <workItem from="1610988306735" duration="57693000" />
+      <workItem from="1610988306735" duration="64797000" />
     </task>
     <task id="LOCAL-00001" summary="not include pytorch states">
       <created>1608521605396</created>
@@ -296,7 +297,14 @@
       <option name="project" value="LOCAL" />
       <updated>1611118341084</updated>
     </task>
-    <option name="localTasksCounter" value="14" />
+    <task id="LOCAL-00014" summary="# %%&#10;# Set the random seed manually for reproducibility.&#10;# https://pytorch.org/docs/stable/notes/randomness.html&#10;# https://pytorch.org/docs/stable/generated/torch.set_deterministic.html#torch.set_deterministic&#10;# https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html#torch.nn.LSTM&#10;np.random.seed(args.seed)&#10;random.seed(args.seed)&#10;&#10;torch.manual_seed(args.seed)  # cpu&#10;torch.cuda.manual_seed(args.seed)  # gpu&#10;torch.backends.cudnn.deterministic = True  # cudnn">
+      <created>1611155363881</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1611155363881</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -390,12 +398,12 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py</url>
-          <line>137</line>
+          <line>150</line>
           <option name="timeStamp" value="97" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py</url>
-          <line>186</line>
+          <line>199</line>
           <option name="timeStamp" value="98" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">

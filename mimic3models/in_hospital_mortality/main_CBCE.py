@@ -124,6 +124,19 @@ else:
     # criterion_SupNCE = SupNCELoss(temperature=1)
     # criterion_MCE = nn.CrossEntropyLoss()
 
+    def get_loss(y_pre, labels, representation, alpha=0):
+        # CBCE_WithLogitsLoss is more numerically stable than CBCE_Loss when model is complex/overfitting
+        loss = CBCE_WithLogitsLoss(y_pre, labels)
+        if alpha > 0:
+            if labels.sum().item() < 2:
+                print('Warning: # positives < 2, NOT USING Supervised Contrastive Regularizer')
+            else:
+                if len(representation.shape) == 2:
+                    representation = representation.unsqueeze(1)
+                scl_loss = criterion_SCL(representation, labels)
+                loss = loss + alpha * scl_loss
+        return loss
+
 # set lr and weight_decay later # or use other optimization say adamW later?
 optimizer = torch.optim.Adam(model.parameters(),  lr=args.lr, weight_decay=args.weight_decay)
 training_losses = []
@@ -195,15 +208,7 @@ if args.mode == 'train':
             bsz = labels_batch_train.shape[0]
 
             y_hat_train, y_representation = model(X_batch_train)
-            # CBCE_WithLogitsLoss is more numerically stable when model is complex
-            loss_CE = CBCE_WithLogitsLoss(y_hat_train, labels_batch_train)
-            if args.coef_contra_loss > 0:
-                y_representation = y_representation.unsqueeze(1)
-                loss_SCL = criterion_SCL(y_representation, labels_batch_train)
-                # loss_SCL = criterion_SupNCE(y_representation, labels_batch_train)
-                loss = loss_CE + args.coef_contra_loss * loss_SCL
-            else:
-                loss = loss_CE
+            loss = get_loss(y_hat_train, labels_batch_train, y_representation, args.coef_contra_loss)
             loss.backward()
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.5)  # args.clip) seems little effect
@@ -215,6 +220,7 @@ if args.mode == 'train':
         training_losses.append(training_loss)
 
         # Validation Part
+        print('Validation results:')
         with torch.no_grad():
             model.eval()
             val_losses_batch = []
@@ -224,13 +230,7 @@ if args.mode == 'train':
                 X_batch_val = X_batch_val.float().to(device)
                 labels_batch_val = labels_batch_val.float().to(device)
                 y_hat_val, y_representation_val = model(X_batch_val)
-                val_loss_batch = CBCE_WithLogitsLoss(y_hat_val, labels_batch_val)
-                if args.coef_contra_loss > 0:
-                    y_representation_val = y_representation_val.unsqueeze(1)
-                    val_loss_SCL = criterion_SCL(y_representation_val, labels_batch_val)
-                    # loss_SCL = criterion_SupNCE(y_representation, labels_batch_train)
-                    val_loss_batch = val_loss_batch + args.coef_contra_loss * val_loss_SCL
-
+                val_loss_batch = get_loss(y_hat_val, labels_batch_val, y_representation_val, args.coef_contra_loss)
                 val_losses_batch.append(val_loss_batch.item())
                 # predicted labels
                 y_hat_val = torch.sigmoid(y_hat_val)
@@ -244,12 +244,12 @@ if args.mode == 'train':
             predicted_prob_val = torch.cat(predicted_prob_val, dim=0).cpu().detach().numpy()
             true_labels_val = torch.cat(true_labels_val, dim=0).cpu().detach().numpy()
 
-            print('validation results:')
             val_result = metrics.print_metrics_binary(true_labels_val, predicted_prob_val, verbose=1)
             print(val_result)
             validation_results.append(val_result)
 
         # Additional test part. God View. should not used for model selection
+        print('Test results:')
         predicted_prob_test = []
         true_labels_test = []
         name_test = []
@@ -273,7 +273,6 @@ if args.mode == 'train':
             true_labels_test = true_labels_test.cpu().detach().numpy()
             name_test = np.concatenate(name_test)
 
-            print('test results:')
             test_result = metrics.print_metrics_binary(true_labels_test, predictions_test, verbose=1)
             print(test_result)
             test_results.append(test_result)
