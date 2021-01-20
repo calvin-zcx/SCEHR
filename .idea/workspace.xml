@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="">
+    <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="get_loss, deal with small batch">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" afterDir="false" />
@@ -75,6 +75,9 @@
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
       <option name="IS_MODULE_SDK" value="true" />
@@ -157,6 +160,9 @@
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
       <option name="IS_MODULE_SDK" value="true" />
@@ -204,7 +210,8 @@
       <workItem from="1608822321595" duration="6512000" />
       <workItem from="1609190346281" duration="10882000" />
       <workItem from="1609363799607" duration="232734000" />
-      <workItem from="1610988306735" duration="64797000" />
+      <workItem from="1610988306735" duration="65099000" />
+      <workItem from="1611162810485" duration="1000000" />
     </task>
     <task id="LOCAL-00001" summary="not include pytorch states">
       <created>1608521605396</created>
@@ -304,7 +311,14 @@
       <option name="project" value="LOCAL" />
       <updated>1611155363881</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="get_loss, deal with small batch">
+      <created>1611162722656</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1611162722656</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -336,7 +350,8 @@
     <MESSAGE value="add log" />
     <MESSAGE value="dirname = os.path.dirname(path)&#10;            if not os.path.exists(dirname):&#10;                os.makedirs(dirname)" />
     <MESSAGE value="# %%&#10;# Set the random seed manually for reproducibility.&#10;# https://pytorch.org/docs/stable/notes/randomness.html&#10;# https://pytorch.org/docs/stable/generated/torch.set_deterministic.html#torch.set_deterministic&#10;# https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html#torch.nn.LSTM&#10;np.random.seed(args.seed)&#10;random.seed(args.seed)&#10;&#10;torch.manual_seed(args.seed)  # cpu&#10;torch.cuda.manual_seed(args.seed)  # gpu&#10;torch.backends.cudnn.deterministic = True  # cudnn" />
-    <option name="LAST_COMMIT_MESSAGE" value="# %%&#10;# Set the random seed manually for reproducibility.&#10;# https://pytorch.org/docs/stable/notes/randomness.html&#10;# https://pytorch.org/docs/stable/generated/torch.set_deterministic.html#torch.set_deterministic&#10;# https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html#torch.nn.LSTM&#10;np.random.seed(args.seed)&#10;random.seed(args.seed)&#10;&#10;torch.manual_seed(args.seed)  # cpu&#10;torch.cuda.manual_seed(args.seed)  # gpu&#10;torch.backends.cudnn.deterministic = True  # cudnn" />
+    <MESSAGE value="get_loss, deal with small batch" />
+    <option name="LAST_COMMIT_MESSAGE" value="get_loss, deal with small batch" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -405,11 +420,6 @@
           <url>file://$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py</url>
           <line>199</line>
           <option name="timeStamp" value="98" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py</url>
-          <line>86</line>
-          <option name="timeStamp" value="99" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

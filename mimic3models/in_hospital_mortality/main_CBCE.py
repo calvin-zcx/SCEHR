@@ -287,13 +287,11 @@ if args.mode == 'train':
 
         model_final_name = model.say_name()
         path = os.path.join('pytorch_states/CBCE/' + model_final_name
-                            + '.bs{}.epo{}.TrLos{:.2f}.CBCE+SCL-a{}.wdcy{}.'
-                              'ValLos{:.2f}.ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.'
+                            + '.CBCE+SCL.a{}.bs{}.wdcy{}.epo{}.TrLos{:.2f}.'
+                              'VaLos{:.2f}.ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.'
                               'TstACC{:.3f}.ROC{:.4f}.PRC{:.4f}'.
-                            format(args.batch_size, epoch, training_loss,
-                                   args.coef_contra_loss,
-                                   args.weight_decay,
-                                   validation_loss,
+                            format(args.coef_contra_loss, args.batch_size, args.weight_decay,
+                                   epoch, training_loss, validation_loss,
                                    val_result['acc'], val_result['auroc'], val_result['auprc'],
                                    test_result['acc'], test_result['auroc'], test_result['auprc']))
         model_names.append(path + '.pt')
