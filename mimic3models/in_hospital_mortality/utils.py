@@ -61,6 +61,7 @@ def generate_grid_search_CBCE_cmd():
 def summarize_results_from_csv_files(dir):
     # pytorch_states/CBCE/
     f_list = list(filter(lambda x: '.csv' in x, os.listdir(dir)))
+    print('len(f_list)', len(f_list))
     val = []
     test = []
     for f_name in f_list:

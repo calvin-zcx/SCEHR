@@ -6,8 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -49,7 +47,7 @@
   <component name="ReaderModeSettings">
     <option name="enabled" value="false" />
   </component>
-  <component name="RunManager" selected="Python.main_CBCE">
+  <component name="RunManager" selected="Python.utils">
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -182,8 +180,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.main_CBCE" />
         <item itemvalue="Python.utils" />
+        <item itemvalue="Python.main_CBCE" />
         <item itemvalue="Python.main_BCE" />
         <item itemvalue="Python.main_BCEwithlogit" />
         <item itemvalue="Python.main_CBCE_old" />
@@ -205,7 +203,7 @@
       <workItem from="1608822321595" duration="6512000" />
       <workItem from="1609190346281" duration="10882000" />
       <workItem from="1609363799607" duration="232734000" />
-      <workItem from="1610988306735" duration="55416000" />
+      <workItem from="1610988306735" duration="57693000" />
     </task>
     <task id="LOCAL-00001" summary="not include pytorch states">
       <created>1608521605396</created>
@@ -291,7 +289,14 @@
       <option name="project" value="LOCAL" />
       <updated>1611096960692</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="# %%&#10;# Set the random seed manually for reproducibility.&#10;# https://pytorch.org/docs/stable/notes/randomness.html&#10;# https://pytorch.org/docs/stable/generated/torch.set_deterministic.html#torch.set_deterministic&#10;# https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html#torch.nn.LSTM&#10;np.random.seed(args.seed)&#10;random.seed(args.seed)&#10;&#10;torch.manual_seed(args.seed)  # cpu&#10;torch.cuda.manual_seed(args.seed)  # gpu&#10;torch.backends.cudnn.deterministic = True  # cudnn">
+      <created>1611118341084</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1611118341084</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -322,7 +327,8 @@
     <MESSAGE value="import sys&#10;# for linux env.&#10;sys.path.insert(0, '../..')" />
     <MESSAGE value="add log" />
     <MESSAGE value="dirname = os.path.dirname(path)&#10;            if not os.path.exists(dirname):&#10;                os.makedirs(dirname)" />
-    <option name="LAST_COMMIT_MESSAGE" value="dirname = os.path.dirname(path)&#10;            if not os.path.exists(dirname):&#10;                os.makedirs(dirname)" />
+    <MESSAGE value="# %%&#10;# Set the random seed manually for reproducibility.&#10;# https://pytorch.org/docs/stable/notes/randomness.html&#10;# https://pytorch.org/docs/stable/generated/torch.set_deterministic.html#torch.set_deterministic&#10;# https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html#torch.nn.LSTM&#10;np.random.seed(args.seed)&#10;random.seed(args.seed)&#10;&#10;torch.manual_seed(args.seed)  # cpu&#10;torch.cuda.manual_seed(args.seed)  # gpu&#10;torch.backends.cudnn.deterministic = True  # cudnn" />
+    <option name="LAST_COMMIT_MESSAGE" value="# %%&#10;# Set the random seed manually for reproducibility.&#10;# https://pytorch.org/docs/stable/notes/randomness.html&#10;# https://pytorch.org/docs/stable/generated/torch.set_deterministic.html#torch.set_deterministic&#10;# https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html#torch.nn.LSTM&#10;np.random.seed(args.seed)&#10;random.seed(args.seed)&#10;&#10;torch.manual_seed(args.seed)  # cpu&#10;torch.cuda.manual_seed(args.seed)  # gpu&#10;torch.backends.cudnn.deterministic = True  # cudnn" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -394,7 +400,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py</url>
-          <line>85</line>
+          <line>86</line>
           <option name="timeStamp" value="99" />
         </line-breakpoint>
       </breakpoints>
