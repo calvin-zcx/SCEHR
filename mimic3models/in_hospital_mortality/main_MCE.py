@@ -1,5 +1,8 @@
 from __future__ import absolute_import
 from __future__ import print_function
+import sys
+# for linux env.
+sys.path.insert(0, '../..')
 
 import numpy as np
 import argparse
@@ -12,22 +15,22 @@ from mimic3models import metrics
 from mimic3models import common_utils
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset, TensorDataset
-# from torch.utils.data.dataset import random_split
-# from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
 import torch.nn.functional as F
-from mimic3models.pytorch_models.lstm import LSTM_PT, predict_labels
-from mimic3models.pytorch_models.losses import SupConLoss, SupNCELoss
+
+from mimic3models.pytorch_models.lstm import LSTM_PT
+from mimic3models.pytorch_models.losses import SupConLoss, SupNCELoss, CBCE_loss, CBCE_WithLogitsLoss
 from tqdm import tqdm
 from mimic3models.time_report import TimeReport
-from mimic3models.pytorch_models.torch_utils import model_summary, TimeDistributed, shuffle_within_labels,shuffle_time_dim
-from mimic3models.in_hospital_mortality.utils import random_add_positive_samples
-import functools
-print = functools.partial(print, flush=True)
-
+from mimic3models.pytorch_models.torch_utils import Dataset, optimizer_to, model_summary
 import matplotlib.pyplot as plt
 import pandas as pd
+import functools
+import random
+print = functools.partial(print, flush=True)
 
+# %%
+# Arguments:
 parser = argparse.ArgumentParser()
 common_utils.add_common_arguments(parser)
 parser.add_argument('--target_repl_coef', type=float, default=0.0)
@@ -44,18 +47,26 @@ parser.add_argument('--clip', type=float, default=0.25,
                     help='gradient clipping')
 parser.add_argument('--log_interval', type=int, default=50, metavar='N',
                     help='report interval')
-
 parser.add_argument('--coef_contra_loss', type=float, default=0, help='CE + coef * contrastive loss')
-
-# parser.add_argument('--add_positive', action='store_true',
-#                     help='add_positive_to_data')
+parser.add_argument('--weight_decay', type=float, default=1e-5, help='weight_decay of adam')
 args = parser.parse_args()
 print(args)
-# if args.small_part:
-#     args.save_every = 2**30
 
+# %%
+# Set the random seed manually for reproducibility.
+# https://pytorch.org/docs/stable/notes/randomness.html
+# https://pytorch.org/docs/stable/generated/torch.set_deterministic.html#torch.set_deterministic
+# https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html#torch.nn.LSTM
+np.random.seed(args.seed)
+random.seed(args.seed)
+
+torch.manual_seed(args.seed)  # cpu
+torch.cuda.manual_seed(args.seed)  # gpu
+torch.backends.cudnn.deterministic = True  # cudnn
+
+# %%
+# Load data readers
 target_repl = (args.target_repl_coef > 0.0 and args.mode == 'train')
-
 # Build readers, discretizers, normalizers
 train_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'train'),
                                          listfile=os.path.join(args.data, 'train_listfile.csv'),
@@ -88,10 +99,14 @@ args_dict = dict(args._get_kwargs())
 args_dict['header'] = discretizer_header
 args_dict['task'] = 'ihm'
 args_dict['target_repl'] = target_repl
-#
-# Set the random seed manually for reproducibility.
-np.random.seed(args.seed)
-torch.manual_seed(args.seed)
+
+# %%
+# GPU, Model, Optimizer, Criterion Setup/Loading
+if torch.cuda.is_available():
+    if not args.cuda:
+        print("WARNING: Got {} CUDA devices! Probably run with --cuda".format(torch.cuda.device_count()))
+device = torch.device("cuda" if args.cuda else "cpu")
+print('Using device: ', device)
 
 # Build the model
 if args.network == "lstm":
@@ -105,29 +120,31 @@ else:
 if target_repl:
     raise NotImplementedError
 else:
-    criterion_BCE = nn.BCELoss()
+    # criterion_BCE = nn.BCELoss()
     criterion_SCL = SupConLoss(temperature=0.1)   # temperature=0.01)  # temperature=opt.temp
-    criterion_SupNCE = SupNCELoss(temperature=1)
+    # criterion_SupNCE = SupNCELoss(temperature=1)
     criterion_MCE = nn.CrossEntropyLoss()
 
-    def CBCE_loss(y_pre, y):
-        # contrastive binary cross entropy loss
-        # y_pre: (bs, 2), after sigmoid
-        # y: (bs,)
-        i1 = (y==1)
-        i0 = (y==0)
-        pos_anchor = y_pre[i1, 1].log() + (1.-y_pre[i1, 0]).log()
-        neg_anchor = y_pre[i0, 0].log() + (1.-y_pre[i0, 1]).log()
-        ret = -torch.cat([pos_anchor, neg_anchor]).mean()
-        return ret
+    def get_loss(y_pre, labels, representation, alpha=0):
+        # CBCE_WithLogitsLoss is more numerically stable than CBCE_Loss when model is complex/overfitting
+        loss = criterion_MCE(y_pre, labels)
+        if alpha > 0:
+            if labels.sum().item() < 2:
+                print('Warning: # positives < 2, NOT USING Supervised Contrastive Regularizer')
+            else:
+                if len(representation.shape) == 2:
+                    representation = representation.unsqueeze(1)
+                scl_loss = criterion_SCL(representation, labels)
+                loss = loss + alpha * scl_loss
+        return loss
 
 # set lr and weight_decay later # or use other optimization say adamW later?
-optimizer = torch.optim.Adam(model.parameters(),  lr=1e-3, weight_decay=0) # 1e-4)
+optimizer = torch.optim.Adam(model.parameters(),  lr=args.lr, weight_decay=args.weight_decay)
 training_losses = []
 validation_losses = []
 validation_results = []
 test_results = []
-
+model_names = []
 # Load model weights # n_trained_chunks = 0
 start_from_epoch = 0
 if args.load_state != "":
@@ -139,16 +156,13 @@ if args.load_state != "":
     training_losses = checkpoint['training_losses']
     validation_losses = checkpoint['validation_losses']
     validation_results = checkpoint['validation_results']
+    test_results = checkpoint['test_results']
+    optimizer_to(optimizer, device)
     print("Load epoch: ", start_from_epoch, 'Load model: ', )
     print(model)
     print('Load model done!')
     # n_trained_chunks = int(re.match(".*Epoch([0-9]+).*", args.load_state).group(1))
 
-if torch.cuda.is_available():
-    if not args.cuda:
-        print("WARNING: Got {} CUDA devices! Probably run with --cuda".format(torch.cuda.device_count()))
-device = torch.device("cuda" if args.cuda else "cpu")
-print('Using device: ', device)
 model.to(device)
 try:
     criterion_SCL.to(device)
@@ -157,137 +171,108 @@ except NameError:
 print(model)
 model_summary(model)
 
+# %%
+# Training & Testing parts:
 if args.mode == 'train':
-    print('Beginning training & validation data loading...')
-    # Read data
+    print('Training part: beginning loading training & validation datasets...')
     start_time = time.time()
-    train_raw = utils.load_data(train_reader, discretizer, normalizer, args.small_part)  # (14681,48,76), (14681,)
-    val_raw = utils.load_data(val_reader, discretizer, normalizer, args.small_part)  # (3222,48,76), (3222,)
-    test_raw = utils.load_data(test_reader, discretizer, normalizer, args.small_part)
+    train_raw = utils.load_data(train_reader, discretizer, normalizer, args.small_part, return_names=True)  # (14681,48,76), (14681,)
+    val_raw = utils.load_data(val_reader, discretizer, normalizer, args.small_part, return_names=True)  # (3222,48,76), (3222,)
+    test_raw = utils.load_data(test_reader, discretizer, normalizer, args.small_part, return_names=True)
 
-    # print('add positive data! train_raw[0].shape:', train_raw[0].shape)
-    # y = np.array(train_raw[1])
-    # xx, yy = random_add_positive_samples(train_raw[0], y, y.shape[0] - 2*y.sum())
-    # train_raw = (xx, yy)
-    # print('add positive data done! train_raw[0].shape:', train_raw[0].shape)
+    train_dataset = Dataset(train_raw['data'][0], train_raw['data'][1], train_raw['names'])
+    valid_dataset = Dataset(val_raw['data'][0], val_raw['data'][1], val_raw['names'])
+    test_dataset = Dataset(test_raw['data'][0], test_raw['data'][1], test_raw['names'])
 
-    train_raw_torch = TensorDataset(torch.tensor(train_raw[0], dtype=torch.float32),
-                                    torch.tensor(train_raw[1], dtype=torch.long))
-    val_raw_torch = TensorDataset(torch.tensor(val_raw[0], dtype=torch.float32),
-                                  torch.tensor(val_raw[1], dtype=torch.long))
-    test_raw_torch = TensorDataset(torch.tensor(test_raw[0], dtype=torch.float32),
-                                   torch.tensor(test_raw[1], dtype=torch.long))
-
-    train_loader = DataLoader(dataset=train_raw_torch, batch_size=args.batch_size, drop_last=False, shuffle=True)
-    val_loader = DataLoader(dataset=val_raw_torch, batch_size=args.batch_size, drop_last=False, shuffle=False)
-    test_loader = DataLoader(dataset=test_raw_torch, batch_size=args.batch_size, drop_last=False, shuffle=False)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, drop_last=False, shuffle=True)
+    val_loader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, drop_last=False, shuffle=False)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, drop_last=False, shuffle=False)
 
     h_, m_, s_ = TimeReport._hms(time.time() - start_time)
     print('Load training & validation data done. Elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))
     print('Data summary:')
     print(' batch size: ', args.batch_size)
-    print(' len(train_raw_torch): ', len(train_raw_torch), 'len(train_loader): ', len(train_loader))
-    print(' len(val_raw_torch): ', len(val_raw_torch), 'len(val_loader): ', len(val_loader))
-    print(' len(test_raw_torch): ', len(test_raw_torch), 'len(test_loader): ', len(test_loader))
-
+    print(' len(train_dataset): ', len(train_dataset), 'len(train_loader): ', len(train_loader))
+    print(' len(valid_dataset): ', len(valid_dataset), 'len(val_loader): ', len(val_loader))
+    print(' len(test_dataset): ', len(test_dataset), 'len(test_loader): ', len(test_loader))
     print("Beginning model training...")
-    model.train()
+
     iter_per_epoch = len(train_loader)
     tr = TimeReport(total_iter=args.epochs * iter_per_epoch)
     for epoch in (range(1+start_from_epoch, 1+args.epochs)): #tqdm
+        model.train()
         train_losses_batch = []
-        i = 0
-        for X_batch_train, labels_batch_train in train_loader:
-            i += 1
+        for i, (X_batch_train, labels_batch_train, name_batch_train) in enumerate(train_loader):
             optimizer.zero_grad()
-            X_batch_train = X_batch_train.to(device)
-            labels_batch_train = labels_batch_train.to(device)
-            bsz = labels_batch_train.shape[0]
-
+            X_batch_train = X_batch_train.float().to(device)
+            labels_batch_train = labels_batch_train.long().to(device)
+            # bsz = labels_batch_train.shape[0]
             y_hat_train, y_representation = model(X_batch_train)
-            # loss_CE = CBCE_loss(y_hat_train, labels_batch_train)  #
-            loss_CE = criterion_MCE(y_hat_train, labels_batch_train)
-            if args.coef_contra_loss > 0:
-
-                y_representation = y_representation.unsqueeze(1)
-                loss_SCL = criterion_SCL(y_representation, labels_batch_train)
-                # loss_SCL = criterion_SupNCE(y_representation, labels_batch_train)
-                loss = loss_CE + args.coef_contra_loss * loss_SCL
-            else:
-                loss = loss_CE  #  criterion(y_hat_train, labels_batch_train) #
+            loss = get_loss(y_hat_train, labels_batch_train, y_representation, args.coef_contra_loss)
             loss.backward()
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.5)  # args.clip) seems little effect
             optimizer.step()
-
-            train_loss_batch = loss.item()
-            train_losses_batch.append(train_loss_batch)
+            train_losses_batch.append(loss.item())
             tr.update()
 
         training_loss = np.mean(train_losses_batch)
         training_losses.append(training_loss)
 
         # Validation Part
+        print('Validation results:')
         with torch.no_grad():
-            val_losses_batch = []
             model.eval()
+            val_losses_batch = []
             predicted_prob_val = []
             true_labels_val = []
-            for X_batch_val, labels_batch_val in val_loader:
-                X_batch_val = X_batch_val.to(device)
-                labels_batch_val = labels_batch_val.to(device)
-                y_hat_val, _ = model(X_batch_val)
-                val_loss_batch = criterion_MCE(y_hat_val, labels_batch_val).item()
-                # val_loss_batch = CBCE_loss(y_hat_val, labels_batch_val).item()
-                val_losses_batch.append(val_loss_batch)
+            for X_batch_val, labels_batch_val, name_batch_val in val_loader:
+                X_batch_val = X_batch_val.float().to(device)
+                labels_batch_val = labels_batch_val.long().to(device)
+                y_hat_val, y_representation_val = model(X_batch_val)
+                val_loss_batch = get_loss(y_hat_val, labels_batch_val, y_representation_val, args.coef_contra_loss)
+                val_losses_batch.append(val_loss_batch.item())
                 # predicted labels
-                # p_batch_val, _ = predict_labels(y_hat_val)
-                # predicted_prob_val.append(p_batch_val)
-                predicted_prob_val.append(y_hat_val)
+                y_hat_val = F.softmax(y_hat_val, dim=1)
+                predicted_prob_val.append(y_hat_val[:, 1])
                 true_labels_val.append(labels_batch_val)
 
             validation_loss = np.mean(val_losses_batch)
             validation_losses.append(validation_loss)
 
-            predicted_prob_val = torch.cat(predicted_prob_val, dim=0)
-            true_labels_val = torch.cat(true_labels_val, dim=0)
-            predicted_prob_val, _ = predict_labels(predicted_prob_val)
-            predicted_prob_val_pos = (predicted_prob_val.cpu().detach().numpy())[:, 1]
-            # predicted_prob_val_pos = predicted_prob_val_pos[:, 1] * (1 - predicted_prob_val_pos[:, 0])
+            predicted_prob_val = torch.cat(predicted_prob_val, dim=0).cpu().detach().numpy()
+            true_labels_val = torch.cat(true_labels_val, dim=0).cpu().detach().numpy()
 
-            true_labels_val = true_labels_val.cpu().detach().numpy()
-            print('validation results:')
-            val_result = metrics.print_metrics_binary(true_labels_val, predicted_prob_val_pos, verbose=1)
+            val_result = metrics.print_metrics_binary(true_labels_val, predicted_prob_val, verbose=1)
             print(val_result)
             validation_results.append(val_result)
-            model.train()
 
         # Additional test part. God View. should not used for model selection
+        print('Test results:')
         predicted_prob_test = []
         true_labels_test = []
+        name_test = []
         with torch.no_grad():
             model.eval()
-            for X_batch_test, y_batch_test in test_loader:
-                X_batch_test = X_batch_test.to(device)
-                y_batch_test = y_batch_test.to(device)
+            for X_batch_test, y_batch_test, name_batch_test in test_loader:
+                X_batch_test = X_batch_test.float().to(device)
+                y_batch_test = y_batch_test.long().to(device)
                 y_hat_batch_test, _ = model(X_batch_test)
-                # loss = criterion(y_hat, y_batch)
-                # p_batch, _ = predict_labels(y_hat_batch)
-                # predicted_prob.append(p_batch)
-                predicted_prob_test.append(y_hat_batch_test)
+                y_hat_batch_test = F.softmax(y_hat_batch_test, dim=1)
+                predicted_prob_test.append(y_hat_batch_test[:, 1])
                 true_labels_test.append(y_batch_test)
+                name_test.append(name_batch_test)
+
             predicted_prob_test = torch.cat(predicted_prob_test, dim=0)
             true_labels_test = torch.cat(true_labels_test, dim=0)  # with threshold 0.5, not used here
 
-            predicted_prob_test, _ = predict_labels(predicted_prob_test)
-            predictions_test = (predicted_prob_test.cpu().detach().numpy())[:, 1]
-            # predictions = predictions[:, 1] * (1-predictions[:, 0])
+            predictions_test = (predicted_prob_test.cpu().detach().numpy())
             true_labels_test = true_labels_test.cpu().detach().numpy()
-            print('test results:')
+            name_test = np.concatenate(name_test)
+
             test_result = metrics.print_metrics_binary(true_labels_test, predictions_test, verbose=1)
             print(test_result)
             test_results.append(test_result)
-            model.train()
 
         print('Epoch [{}/{}], {} Iters/Epoch, training_loss: {:.5f}, validation_loss: {:.5f}, '
               '{:.2f} sec/iter, {:.2f} iters/sec: '.
@@ -297,114 +282,116 @@ if args.mode == 'train':
         tr.print_summary()
         print("=" * 50)
 
+        model_final_name = model.say_name()
+        path = os.path.join('pytorch_states/MCE/' + model_final_name
+                            + '.MCE+SCL.a{}.bs{}.wdcy{}.epo{}.TrLos{:.2f}.'
+                              'VaLos{:.2f}.ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.'
+                              'TstACC{:.3f}.ROC{:.4f}.PRC{:.4f}'.
+                            format(args.coef_contra_loss, args.batch_size, args.weight_decay,
+                                   epoch, training_loss, validation_loss,
+                                   val_result['acc'], val_result['auroc'], val_result['auprc'],
+                                   test_result['acc'], test_result['auroc'], test_result['auprc']))
+        model_names.append(path + '.pt')
+        dirname = os.path.dirname(path)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
         if args.save_every and epoch % args.save_every == 0:
             # Set model checkpoint/saving path
-            model_final_name = model.say_name()
-            path = os.path.join('pytorch_states/' + model_final_name
-                                + '.bs{}.epo{}.trLos{:.2f}.MCE+SCL-Coef{}.'
-                                  'Val-Los{:.3f}.ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.'
-                                  'Tst-ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.pt'.
-                                format(args.batch_size, epoch, training_loss,
-                                       "{:.3f}".format(args.coef_contra_loss) if args.coef_contra_loss != 0 else "0",
-                                       validation_loss,
-                                       val_result['acc'], val_result['auroc'], val_result['auprc'],
-                                       test_result['acc'], test_result['auroc'], test_result['auprc']))
-            dirname = os.path.dirname(path)
-            if not os.path.exists(dirname):
-                os.makedirs(dirname)
+            test_details = {
+                'name': name_test,
+                'prediction': predictions_test,
+                'true_labels': true_labels_test
+            }
             torch.save({
+                'model_str': model.__str__(),
+                'args:': args,
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'training_losses': training_losses,
                 'validation_losses': validation_losses,
-                'training_loss': training_loss,
-                'validation_loss': validation_loss,
-                'model_str': model.__str__(),
-                'args:': args,
-                'validation_result': val_result,
-                'validation_results': validation_results
-            }, path)
-            # print('Save ', path, ' done.')
+                'validation_results': validation_results,
+                'test_results': test_results,
+                'test_details': test_details,
+            }, path+'.pt')
+            # pd_test = pd.DataFrame(data=test_details)  # , index=range(1, len(validation_results) + 1))
+            # pd_test.to_csv(path + '_[TEST].csv')
 
     print('Training complete...')
-    try:
-        r = {
-            'auroc-val': [x['auroc'] for x in validation_results],
-            'auroc-test': [x['auroc'] for x in test_results]
-            # 'acc': [x['acc'] for x in validation_results],
-            # 'auprc': [x['auprc'] for x in validation_results]
-        }
-        pdr = pd.DataFrame(data=r, index=range(1, len(validation_results)+1))
-        ax = pdr.plot.line()
-        plt.grid()
-        fig = ax.get_figure()
-        plt.ylim((0.82, 0.87))
-        plt.show()
-        fig.savefig(path + '.png')
-        fig.savefig(path + '.pdf')
-        r_all = {
-            'auroc-val': [x['auroc'] for x in validation_results],
-            'acc-val': [x['acc'] for x in validation_results],
-            'auprc-val': [x['auprc'] for x in validation_results],
-            'auroc-test': [x['auroc'] for x in test_results],
-            'acc-test': [x['acc'] for x in test_results],
-            'auprc-test': [x['auprc'] for x in test_results]
-        }
-        pd_r_all = pd.DataFrame(data=r_all, index=range(1, len(validation_results) + 1))
-        pd_r_all.to_csv(path+'.csv')
-    except ValueError:
-        print("Error in Plotting validation auroc values over epochs")
+    h_, m_, s_ = TimeReport._hms(time.time() - start_time)
+    print('Total Elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))
 
+    r = {
+        'auroc-val': [x['auroc'] for x in validation_results],
+        'auroc-test': [x['auroc'] for x in test_results]
+        # 'acc': [x['acc'] for x in validation_results],
+        # 'auprc': [x['auprc'] for x in validation_results]
+    }
+    pdr = pd.DataFrame(data=r, index=range(1, len(validation_results)+1))
+    ax = pdr.plot.line()
+    plt.grid()
+    fig = ax.get_figure()
+    plt.ylim((0.82, 0.87))
+    plt.show()
+    fig.savefig(path + '.png')
+    # fig.savefig(path + '.pdf')
+    r_all = {
+        'model-name': model_names,
+        'auroc-val': [x['auroc'] for x in validation_results],
+        'acc-val': [x['acc'] for x in validation_results],
+        'auprc-val': [x['auprc'] for x in validation_results],
+        'auroc-test': [x['auroc'] for x in test_results],
+        'acc-test': [x['acc'] for x in test_results],
+        'auprc-test': [x['auprc'] for x in test_results]
+    }
+    pd_r_all = pd.DataFrame(data=r_all, index=range(1, len(validation_results) + 1))
+    pd_r_all.to_csv(path+'.csv')
 
 elif args.mode == 'test':
     print('Beginning testing...')
     start_time = time.time()
     # ensure that the code uses test_reader
-    model.eval()
     model.to(torch.device('cpu'))
 
     del train_reader
     del val_reader
-    del test_reader
+    # del test_reader
+    # test_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'test'),
+    #                                         listfile=os.path.join(args.data, 'test_listfile.csv'),
+    #                                         period_length=48.0)
 
-    test_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'test'),
-                                            listfile=os.path.join(args.data, 'test_listfile.csv'),
-                                            period_length=48.0)
-    ret = utils.load_data(test_reader, discretizer, normalizer, args.small_part,
-                          return_names=True)
-    data = ret["data"][0]
-    labels = ret["data"][1]
-    names = ret["names"]
-    test_raw_torch = TensorDataset(torch.tensor(data, dtype=torch.float32),
-                                   torch.tensor(labels, dtype=torch.long))
-    test_loader = DataLoader(dataset=test_raw_torch, batch_size=args.batch_size, drop_last=False, shuffle=False)
+    ret = utils.load_data(test_reader, discretizer, normalizer, args.small_part, return_names=True)
+    test_dataset = Dataset(ret['data'][0], ret['data'][1], ret['names'])
+    test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, drop_last=False, shuffle=False)
 
     predicted_prob = []
     true_labels = []
+    names = []
     with torch.no_grad():
-        for X_batch, y_batch in tqdm(test_loader):
+        model.eval()
+        for X_batch, y_batch, name_batch in tqdm(test_loader):
+            X_batch = X_batch.float()
+            y_batch = y_batch.long()
             y_hat_batch, _ = model(X_batch)
-            # loss = criterion(y_hat, y_batch)
-            # p_batch, _ = predict_labels(y_hat_batch)
-            # predicted_prob.append(p_batch)
-            predicted_prob.append(y_hat_batch)
-            true_labels.append(y_batch)
-        predicted_prob = torch.cat(predicted_prob, dim=0)
-        true_labels = torch.cat(true_labels, dim=0) # with threshold 0.5, not used here
+            y_hat_batch = F.softmax(y_hat_batch, dim=1)
 
-    predictions, _ = predict_labels(predicted_prob)
-    predictions = (predicted_prob.cpu().detach().numpy())[:, 1]
-    # predictions = predictions[:, 1] * (1-predictions[:, 0])
+            predicted_prob.append(y_hat_batch[:, 1])
+            true_labels.append(y_batch)
+            names.append(name_batch)
+
+        predicted_prob = torch.cat(predicted_prob, dim=0)
+        true_labels = torch.cat(true_labels, dim=0)  # with threshold 0.5, not used here
+        names = np.concatenate(names)
+
+    predictions = predicted_prob.cpu().detach().numpy()
     true_labels = true_labels.cpu().detach().numpy()
     test_results = metrics.print_metrics_binary(true_labels, predictions)
     print(test_results)
-    # path = os.path.join(args.output_dir, "test_predictions", os.path.basename(args.load_state)) + ".csv"
     path = os.path.join("test_predictions", os.path.basename(args.load_state)) + ".csv"
     utils.save_results(names, predictions, true_labels, path)
     h_, m_, s_ = TimeReport._hms(time.time() - start_time)
     print('Testing elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))
-
 else:
     raise ValueError("Wrong value for args.mode")
 

@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser()
 common_utils.add_common_arguments(parser)
 parser.add_argument('--target_repl_coef', type=float, default=0.0)
 parser.add_argument('--data', type=str, help='Path to the data of in-hospital mortality task',
-                    default=os.path.join(os.path.dirname(__file__), '../../data/in-hospital-mortality/'))
+                    default=os.path.join(os.path.dirname(__file__), '../../../data/in-hospital-mortality/'))
 parser.add_argument('--output_dir', type=str, help='Directory relative which all output files are stored',
                     default='.')
 # New added
@@ -65,6 +65,10 @@ val_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'trai
                                        listfile=os.path.join(args.data, 'val_listfile.csv'),
                                        period_length=48.0)
 
+test_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'test'),
+                                        listfile=os.path.join(args.data, 'test_listfile.csv'),
+                                        period_length=48.0)
+
 discretizer = Discretizer(timestep=float(args.timestep),
                           store_masks=True,
                           impute_strategy='previous',
@@ -96,34 +100,32 @@ if args.network == "lstm":
 else:
     raise NotImplementedError
 
-# NOTE: one can use binary_crossentropy even for (B, T, C) shape.
-#       It will calculate binary_crossentropies for each class
-#       and then take the mean over axis=-1. Tre results is (B, T).
+
 if target_repl:
-    # loss = ['binary_crossentropy'] * 2
-    # loss_weights = [1 - args.target_repl_coef, args.target_repl_coef]
     raise NotImplementedError
 else:
-    # criterion = nn.CrossEntropyLoss()
-    criterion = nn.BCELoss()
+    criterion_BCE = nn.BCELoss()
     criterion_SCL = SupConLoss(temperature=0.1)   # temperature=0.01)  # temperature=opt.temp
     criterion_SupNCE = SupNCELoss(temperature=1)
+    criterion_MCE = nn.CrossEntropyLoss()
 
-    def NEC_loss(y_pre, y):
+    def CBCE_loss(y_pre, y):
+        # contrastive binary cross entropy loss
         # y_pre: (bs, 2), after sigmoid
         # y: (bs,)
         i1 = (y==1)
         i0 = (y==0)
         pos_anchor = y_pre[i1, 1].log() + (1.-y_pre[i1, 0]).log()
         neg_anchor = y_pre[i0, 0].log() + (1.-y_pre[i0, 1]).log()
-        ret = torch.cat([pos_anchor, neg_anchor]).mean()
-        return -ret
+        ret = -torch.cat([pos_anchor, neg_anchor]).mean()
+        return ret
 
 # set lr and weight_decay later # or use other optimization say adamW later?
 optimizer = torch.optim.Adam(model.parameters(),  lr=1e-3, weight_decay=0) # 1e-4)
 training_losses = []
 validation_losses = []
 validation_results = []
+test_results = []
 
 # Load model weights # n_trained_chunks = 0
 start_from_epoch = 0
@@ -160,6 +162,7 @@ if args.mode == 'train':
     start_time = time.time()
     train_raw = utils.load_data(train_reader, discretizer, normalizer, args.small_part)  # (14681,48,76), (14681,)
     val_raw = utils.load_data(val_reader, discretizer, normalizer, args.small_part)  # (3222,48,76), (3222,)
+    test_raw = utils.load_data(test_reader, discretizer, normalizer, args.small_part)
 
     # print('add positive data! train_raw[0].shape:', train_raw[0].shape)
     # y = np.array(train_raw[1])
@@ -171,19 +174,24 @@ if args.mode == 'train':
                                     torch.tensor(train_raw[1], dtype=torch.float32))
     val_raw_torch = TensorDataset(torch.tensor(val_raw[0], dtype=torch.float32),
                                   torch.tensor(val_raw[1], dtype=torch.float32))
+    test_raw_torch = TensorDataset(torch.tensor(test_raw[0], dtype=torch.float32),
+                                   torch.tensor(test_raw[1], dtype=torch.long))
 
     train_loader = DataLoader(dataset=train_raw_torch, batch_size=args.batch_size, drop_last=False, shuffle=True)
     val_loader = DataLoader(dataset=val_raw_torch, batch_size=args.batch_size, drop_last=False, shuffle=False)
+    test_loader = DataLoader(dataset=test_raw_torch, batch_size=args.batch_size, drop_last=False, shuffle=False)
+
     h_, m_, s_ = TimeReport._hms(time.time() - start_time)
     print('Load training & validation data done. Elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))
     print('Data summary:')
-    print(' len(train_raw_torch): ', len(train_raw_torch), 'len(val_raw_torch): ', len(val_raw_torch))
     print(' batch size: ', args.batch_size)
-    print(' len(train_loader): ', len(train_loader), 'len(val_loader): ', len(val_loader))
+    print(' len(train_raw_torch): ', len(train_raw_torch), 'len(train_loader): ', len(train_loader))
+    print(' len(val_raw_torch): ', len(val_raw_torch), 'len(val_loader): ', len(val_loader))
+    print(' len(test_raw_torch): ', len(test_raw_torch), 'len(test_loader): ', len(test_loader))
 
     print("Beginning model training...")
     model.train()
-    iter_per_epoch = (len(train_loader) + args.batch_size - 1) // args.batch_size
+    iter_per_epoch = len(train_loader)
     tr = TimeReport(total_iter=args.epochs * iter_per_epoch)
     for epoch in (range(1+start_from_epoch, 1+args.epochs)): #tqdm
         train_losses_batch = []
@@ -194,27 +202,15 @@ if args.mode == 'train':
             X_batch_train = X_batch_train.to(device)
             labels_batch_train = labels_batch_train.to(device)
             bsz = labels_batch_train.shape[0]
-            # Data augmentation
-            # # X_batch_aug = shuffle_time_dim(X_batch_train)
-            # # X_batch_aug = torch.flip(X_batch_train, dims=[1])
-            # X_batch_aug = X_batch_train + torch.randn(X_batch_train.shape).to(device)
-            # X_batch_train = torch.cat([X_batch_train, X_batch_aug], dim=0)
-            #
+
             y_hat_train, y_representation = model(X_batch_train)
-            # loss_CE = criterion(y_hat_train, labels_batch_train)
-            loss_CE = NEC_loss(y_hat_train, labels_batch_train)
+            loss_CE = CBCE_loss(y_hat_train, labels_batch_train)  # loss_CE = criterion(y_hat_train, labels_batch_train)
             if args.coef_contra_loss > 0:
-                # y_representation = torch.cat([y_representation.unsqueeze(1), y_representation.unsqueeze(1)], dim=1)
-                # y_representation = torch.cat([y_representation.unsqueeze(1),
-                #                               shuffle_within_labels(y_representation, labels_batch_train).unsqueeze(1)]
-                #                              , dim=1)
-                # f1, f2 = torch.split(y_representation, [bsz, bsz], dim=0)  # (bs, 128), (bs, 128)
-                # y_representation = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)  # (bs, 2, 128)
+
                 y_representation = y_representation.unsqueeze(1)
                 loss_SCL = criterion_SCL(y_representation, labels_batch_train)
                 # loss_SCL = criterion_SupNCE(y_representation, labels_batch_train)
-                # loss = criterion(y_hat_train.chunk(2, dim=0)[0], labels_batch_train) + args.coef_contra_loss * loss_SCL
-                loss = (1. - args.coef_contra_loss) * loss_CE + args.coef_contra_loss * loss_SCL
+                loss = loss_CE + args.coef_contra_loss * loss_SCL
             else:
                 loss = loss_CE  #  criterion(y_hat_train, labels_batch_train) #
             loss.backward()
@@ -229,6 +225,7 @@ if args.mode == 'train':
         training_loss = np.mean(train_losses_batch)
         training_losses.append(training_loss)
 
+        # Validation Part
         with torch.no_grad():
             val_losses_batch = []
             model.eval()
@@ -239,7 +236,7 @@ if args.mode == 'train':
                 labels_batch_val = labels_batch_val.to(device)
                 y_hat_val, _ = model(X_batch_val)
                 # val_loss_batch = criterion(y_hat_val, labels_batch_val).item()
-                val_loss_batch = NEC_loss(y_hat_val, labels_batch_val).item()
+                val_loss_batch = CBCE_loss(y_hat_val, labels_batch_val).item()
                 val_losses_batch.append(val_loss_batch)
                 # predicted labels
                 # p_batch_val, _ = predict_labels(y_hat_val)
@@ -252,33 +249,64 @@ if args.mode == 'train':
 
             predicted_prob_val = torch.cat(predicted_prob_val, dim=0)
             true_labels_val = torch.cat(true_labels_val, dim=0)
+            predicted_prob_val = predicted_prob_val / predicted_prob_val.sum(dim=1, keepdim=True)
             predicted_prob_val_pos = (predicted_prob_val.cpu().detach().numpy())[:, 1]
             # predicted_prob_val_pos = predicted_prob_val_pos[:, 1] * (1 - predicted_prob_val_pos[:, 0])
 
             true_labels_val = true_labels_val.cpu().detach().numpy()
-            val_result = metrics.print_metrics_binary(true_labels_val, predicted_prob_val_pos, verbose=0)
+            print('validation results:')
+            val_result = metrics.print_metrics_binary(true_labels_val, predicted_prob_val_pos, verbose=1)
+            print(val_result)
             validation_results.append(val_result)
             model.train()
 
-        # if (epoch+1) % args.log_interval == 0: move into interation
+        # Additional test part. God View. should not used for model selection
+        predicted_prob_test = []
+        true_labels_test = []
+        with torch.no_grad():
+            model.eval()
+            for X_batch_test, y_batch_test in test_loader:
+                X_batch_test = X_batch_test.to(device)
+                y_batch_test = y_batch_test.to(device)
+                y_hat_batch_test, _ = model(X_batch_test)
+                # loss = criterion(y_hat, y_batch)
+                # p_batch, _ = predict_labels(y_hat_batch)
+                # predicted_prob.append(p_batch)
+                predicted_prob_test.append(y_hat_batch_test)
+                true_labels_test.append(y_batch_test)
+            predicted_prob_test = torch.cat(predicted_prob_test, dim=0)
+            true_labels_test = torch.cat(true_labels_test, dim=0)  # with threshold 0.5, not used here
+
+            predicted_prob_test = predicted_prob_test / predicted_prob_test.sum(dim=1, keepdim=True)
+            predictions_test = (predicted_prob_test.cpu().detach().numpy())[:, 1]
+            # predictions = predictions[:, 1] * (1-predictions[:, 0])
+            true_labels_test = true_labels_test.cpu().detach().numpy()
+            print('test results:')
+            test_result = metrics.print_metrics_binary(true_labels_test, predictions_test, verbose=1)
+            print(test_result)
+            test_results.append(test_result)
+            model.train()
+
         print('Epoch [{}/{}], {} Iters/Epoch, training_loss: {:.5f}, validation_loss: {:.5f}, '
               '{:.2f} sec/iter, {:.2f} iters/sec: '.
               format(epoch, args.epochs, iter_per_epoch,
                      training_loss, validation_loss,
                      tr.get_avg_time_per_iter(), tr.get_avg_iter_per_sec()))
         tr.print_summary()
-        print(val_result)
+        print("=" * 50)
 
         if args.save_every and epoch % args.save_every == 0:
             # Set model checkpoint/saving path
             model_final_name = model.say_name()
             path = os.path.join('pytorch_states/' + model_final_name
-                                + 'gclip1.5.bs{}.epoch{}.trainLoss{:.3f}'
-                                  '.Val-NCE+SCL-CoefCL{}.Loss{:.3f}.ACC{:.3f}.AUROC{:.4f}.AUPRC{:.4f}.pt'.
+                                + '.bs{}.epo{}.trLos{:.2f}.CBCE+SCL-Coef{}.'
+                                  'Val-Los{:.3f}.ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.'
+                                  'Tst-ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.pt'.
                                 format(args.batch_size, epoch, training_loss,
                                        "{:.3f}".format(args.coef_contra_loss) if args.coef_contra_loss != 0 else "0",
                                        validation_loss,
-                                       val_result['acc'], val_result['auroc'], val_result['auprc']))
+                                       val_result['acc'], val_result['auroc'], val_result['auprc'],
+                                       test_result['acc'], test_result['auroc'], test_result['auprc']))
             dirname = os.path.dirname(path)
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
@@ -300,7 +328,8 @@ if args.mode == 'train':
     print('Training complete...')
     try:
         r = {
-            'auroc': [x['auroc'] for x in validation_results],
+            'auroc-val': [x['auroc'] for x in validation_results],
+            'auroc-test': [x['auroc'] for x in test_results]
             # 'acc': [x['acc'] for x in validation_results],
             # 'auprc': [x['auprc'] for x in validation_results]
         }
@@ -308,14 +337,17 @@ if args.mode == 'train':
         ax = pdr.plot.line()
         plt.grid()
         fig = ax.get_figure()
-        plt.ylim((0.8, 0.9))
+        plt.ylim((0.82, 0.87))
         plt.show()
         fig.savefig(path + '.png')
         fig.savefig(path + '.pdf')
         r_all = {
-            'auroc': [x['auroc'] for x in validation_results],
-            'acc': [x['acc'] for x in validation_results],
-            'auprc': [x['auprc'] for x in validation_results]
+            'auroc-val': [x['auroc'] for x in validation_results],
+            'acc-val': [x['acc'] for x in validation_results],
+            'auprc-val': [x['auprc'] for x in validation_results],
+            'auroc-test': [x['auroc'] for x in test_results],
+            'acc-test': [x['acc'] for x in test_results],
+            'auprc-test': [x['auprc'] for x in test_results]
         }
         pd_r_all = pd.DataFrame(data=r_all, index=range(1, len(validation_results) + 1))
         pd_r_all.to_csv(path+'.csv')
@@ -332,6 +364,8 @@ elif args.mode == 'test':
 
     del train_reader
     del val_reader
+    del test_reader
+
     test_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'test'),
                                             listfile=os.path.join(args.data, 'test_listfile.csv'),
                                             period_length=48.0)
@@ -357,13 +391,14 @@ elif args.mode == 'test':
         predicted_prob = torch.cat(predicted_prob, dim=0)
         true_labels = torch.cat(true_labels, dim=0) # with threshold 0.5, not used here
 
+    predicted_prob = predicted_prob / predicted_prob.sum(dim=1, keepdim=True)
     predictions = (predicted_prob.cpu().detach().numpy())[:, 1]
     # predictions = predictions[:, 1] * (1-predictions[:, 0])
     true_labels = true_labels.cpu().detach().numpy()
     test_results = metrics.print_metrics_binary(true_labels, predictions)
     print(test_results)
     # path = os.path.join(args.output_dir, "test_predictions", os.path.basename(args.load_state)) + ".csv"
-    path = os.path.join("test_predictions", os.path.basename(args.load_state)) + ".csv"
+    path = os.path.join("../test_predictions", os.path.basename(args.load_state)) + ".csv"
     utils.save_results(names, predictions, true_labels, path)
     h_, m_, s_ = TimeReport._hms(time.time() - start_time)
     print('Testing elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))

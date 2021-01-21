@@ -9,6 +9,7 @@ import os
 import pandas as pd
 import re
 
+
 def load_data(reader, discretizer, normalizer, small_part=False, return_names=False):
     N = reader.get_number_of_examples()
     if small_part:
@@ -77,9 +78,30 @@ def generate_grid_search_BCE_cmd():
                   "2>&1 | tee log_BCE/BCE+SCL_bach_cmd_a{}.bs{}.weDcy{}.log\n".format(a, bs, decay, a, bs, decay)
             f.write(cmd)
 
-def summarize_results_from_csv_files(dir):
+
+def generate_grid_search_MCE_cmd():
+    v_a = [0, 0.0005, 0.001, 0.0015, 0.002,
+           0.0025, 0.003, 0.0035, 0.004, 0.0045,
+           0.005, 0.0055, 0.006, 0.0065, 0.007,
+           0.0075, 0.008, 0.0085, 0.009, 0.0095, 0.01]
+    v_bs = [64, 128, 256, 512, 1024]
+    v_decay = [0, ]  #, 1e-5, 1e-4, 1e-3]  try to fix the effect of weight decay
+    with open('MCE.cmd', 'w') as f:
+        for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
+            # 2>&1 | tee log/MCE+SCL_hasstatic_a0_bs256_new.log"
+            cmd = "python main_MCE.py --network lstm  " \
+                  "--dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --cuda --save_every 0 --epochs 100 " \
+                  "--coef_contra_loss {}  --batch_size {} --weight_decay {} " \
+                  "2>&1 | tee log_MCE/MCE+SCL_bach_cmd_a{}.bs{}.weDcy{}.log\n".format(a, bs, decay, a, bs, decay)
+            f.write(cmd)
+
+
+def summarize_results_from_csv_files(dir, f_cond=None, out_file=None):
     # pytorch_states/CBCE/
-    f_list = list(filter(lambda x: '.csv' in x, os.listdir(dir)))
+    if f_cond is None:
+        f_list = list(filter(lambda x: '.csv' in x, os.listdir(dir)))
+    else:
+        f_list = list(filter(f_cond, os.listdir(dir)))
     print('len(f_list)', len(f_list))
     val = []
     test = []
@@ -87,9 +109,9 @@ def summarize_results_from_csv_files(dir):
         df = pd.read_csv(os.path.join(dir, f_name), index_col=0)
         id_val = df['auroc-val'].idxmax()
         id_test = df['auroc-test'].idxmax()
-        r_val = df.iloc[id_val,:].copy()
+        r_val = df.loc[id_val,:].copy()
         r_val['file-name'] = f_name
-        r_test = df.iloc[id_test, :].copy()
+        r_test = df.loc[id_test, :].copy()
         r_test['file-name'] = f_name
         val.append(r_val)
         test.append(r_test)
@@ -100,9 +122,11 @@ def summarize_results_from_csv_files(dir):
     df_test = df_test.sort_values(by='auroc-test', ascending=False)
     # if not os.path.exists(args.output_path):
     #     os.makedirs(args.output_path)
-    last = list(filter(lambda a: a != '', re.split("\/", dir)))[-1]
-
-    fo = r'pytorch_states/'+last+'_summarize_results.xlsx'
+    if out_file is None:
+        last = list(filter(lambda a: a != '', re.split("\/", dir)))[-1]
+        fo = r'pytorch_states/'+last+'_results.xlsx'
+    else:
+        fo = out_file
     with pd.ExcelWriter(fo) as writer:
         df_test.to_excel(writer, sheet_name='test')
         df_val.to_excel(writer, sheet_name='validation')
@@ -112,8 +136,17 @@ def summarize_results_from_csv_files(dir):
 def boostrap_interval_and_std():
     pass
 
+
 if __name__ == "__main__":
     # execute only if run as a script
     # generate_grid_search_CBCE_cmd()
-    generate_grid_search_BCE_cmd()
+    # generate_grid_search_BCE_cmd()
+    generate_grid_search_MCE_cmd()
     # summarize_results_from_csv_files(r'pytorch_states/CBCE_Linux/')
+    # summarize_results_from_csv_files(r'pytorch_states/BCE_Linux/')
+    # summarize_results_from_csv_files(r'pytorch_states/BCE_Linux/',
+    #                                  lambda x: ('.csv' in x) and ('BCE+SCL.a0.0.bs' in x),
+    #                                  r'pytorch_states/BCE_Linux_OnlyBCENoSCL_results.xlsx')
+    # summarize_results_from_csv_files(r'pytorch_states/CBCE_Linux/',
+    #                                  lambda x: ('.csv' in x) and ('CBCE+SCL.a0.0.bs' in x),
+    #                                  r'pytorch_states/CBCE_Linux_OnlyCBCENoSCL_results.xlsx')

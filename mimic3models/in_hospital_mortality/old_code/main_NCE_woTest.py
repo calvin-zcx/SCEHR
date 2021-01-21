@@ -17,10 +17,10 @@ from torch.utils.data import DataLoader, Dataset, TensorDataset
 # from sklearn.model_selection import train_test_split
 import torch.nn.functional as F
 from mimic3models.pytorch_models.lstm import LSTM_PT, predict_labels
-from mimic3models.pytorch_models.losses import SupConLoss
+from mimic3models.pytorch_models.losses import SupConLoss, SupNCELoss
 from tqdm import tqdm
 from mimic3models.time_report import TimeReport
-from mimic3models.pytorch_models.torch_utils import model_summary, TimeDistributed, shuffle_within_labels,shuffle_time_dim,optimizer_to
+from mimic3models.pytorch_models.torch_utils import model_summary, TimeDistributed, shuffle_within_labels,shuffle_time_dim
 from mimic3models.in_hospital_mortality.utils import random_add_positive_samples
 import functools
 print = functools.partial(print, flush=True)
@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser()
 common_utils.add_common_arguments(parser)
 parser.add_argument('--target_repl_coef', type=float, default=0.0)
 parser.add_argument('--data', type=str, help='Path to the data of in-hospital mortality task',
-                    default=os.path.join(os.path.dirname(__file__), '../../data/in-hospital-mortality/'))
+                    default=os.path.join(os.path.dirname(__file__), '../../../data/in-hospital-mortality/'))
 parser.add_argument('--output_dir', type=str, help='Directory relative which all output files are stored',
                     default='.')
 # New added
@@ -46,7 +46,7 @@ parser.add_argument('--log_interval', type=int, default=50, metavar='N',
                     help='report interval')
 
 parser.add_argument('--coef_contra_loss', type=float, default=0, help='CE + coef * contrastive loss')
-parser.add_argument('--train_type', type=str, default='pretrain', choices=['pretrain', 'finetune'], help='pretrain and finetune')
+
 # parser.add_argument('--add_positive', action='store_true',
 #                     help='add_positive_to_data')
 args = parser.parse_args()
@@ -92,7 +92,7 @@ torch.manual_seed(args.seed)
 # Build the model
 if args.network == "lstm":
     model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=2,
-                dropout=args.dropout, target_repl=False, deep_supervision=False)
+                dropout=args.dropout, target_repl=False, deep_supervision=False, task='ihm')
 else:
     raise NotImplementedError
 
@@ -104,8 +104,20 @@ if target_repl:
     # loss_weights = [1 - args.target_repl_coef, args.target_repl_coef]
     raise NotImplementedError
 else:
-    criterion = nn.CrossEntropyLoss()
-    criterion_SCL = SupConLoss() #temperature=0.01)  # temperature=opt.temp
+    # criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCELoss()
+    criterion_SCL = SupConLoss(temperature=0.1)   # temperature=0.01)  # temperature=opt.temp
+    criterion_SupNCE = SupNCELoss(temperature=1)
+
+    def NEC_loss(y_pre, y):
+        # y_pre: (bs, 2), after sigmoid
+        # y: (bs,)
+        i1 = (y==1)
+        i0 = (y==0)
+        pos_anchor = y_pre[i1, 1].log() + (1.-y_pre[i1, 0]).log()
+        neg_anchor = y_pre[i0, 0].log() + (1.-y_pre[i0, 1]).log()
+        ret = torch.cat([pos_anchor, neg_anchor]).mean()
+        return -ret
 
 # set lr and weight_decay later # or use other optimization say adamW later?
 optimizer = torch.optim.Adam(model.parameters(),  lr=1e-3, weight_decay=0) # 1e-4)
@@ -117,22 +129,13 @@ validation_results = []
 start_from_epoch = 0
 if args.load_state != "":
     print('Load model state from: ', args.load_state)
-    if args.mode == 'test':
-        checkpoint = torch.load(args.load_state, map_location=torch.device('cpu'))
-    else:
-        checkpoint = torch.load(args.load_state, map_location=torch.device('cuda'))
+    checkpoint = torch.load(args.load_state, map_location=torch.device('cpu'))
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     start_from_epoch = checkpoint['epoch']
     training_losses = checkpoint['training_losses']
     validation_losses = checkpoint['validation_losses']
     validation_results = checkpoint['validation_results']
-    if args.train_type == 'finetune' and 'PreTrain' in args.load_state:
-        start_from_epoch = 0
-        training_losses = []
-        validation_losses = []
-        validation_results = []
-
     print("Load epoch: ", start_from_epoch, 'Load model: ', )
     print(model)
     print('Load model done!')
@@ -151,9 +154,6 @@ except NameError:
 print(model)
 model_summary(model)
 
-if args.load_state != "":
-    optimizer_to(optimizer, device)
-
 if args.mode == 'train':
     print('Beginning training & validation data loading...')
     # Read data
@@ -168,9 +168,9 @@ if args.mode == 'train':
     # print('add positive data done! train_raw[0].shape:', train_raw[0].shape)
 
     train_raw_torch = TensorDataset(torch.tensor(train_raw[0], dtype=torch.float32),
-                                    torch.tensor(train_raw[1], dtype=torch.long))
+                                    torch.tensor(train_raw[1], dtype=torch.float32))
     val_raw_torch = TensorDataset(torch.tensor(val_raw[0], dtype=torch.float32),
-                                  torch.tensor(val_raw[1], dtype=torch.long))
+                                  torch.tensor(val_raw[1], dtype=torch.float32))
 
     train_loader = DataLoader(dataset=train_raw_torch, batch_size=args.batch_size, drop_last=False, shuffle=True)
     val_loader = DataLoader(dataset=val_raw_torch, batch_size=args.batch_size, drop_last=False, shuffle=False)
@@ -183,7 +183,7 @@ if args.mode == 'train':
 
     print("Beginning model training...")
     model.train()
-    iter_per_epoch = len(train_loader)
+    iter_per_epoch = (len(train_loader) + args.batch_size - 1) // args.batch_size
     tr = TimeReport(total_iter=args.epochs * iter_per_epoch)
     for epoch in (range(1+start_from_epoch, 1+args.epochs)): #tqdm
         train_losses_batch = []
@@ -200,36 +200,26 @@ if args.mode == 'train':
             # X_batch_aug = X_batch_train + torch.randn(X_batch_train.shape).to(device)
             # X_batch_train = torch.cat([X_batch_train, X_batch_aug], dim=0)
             #
-
-            if args.train_type == 'pretrain':
-                # add data augmentation later
-                feat = model.forward_contrastive_pretrain(X_batch_train)
-                feat = feat.unsqueeze(1)
-                loss = criterion_SCL(feat, labels_batch_train) # contrastive
-            elif args.train_type == 'finetune':
-                y_hat_train = model.forward_fine_tune(X_batch_train, isFineTune=False)
-                loss = criterion(y_hat_train, labels_batch_train)  # cross entropy
-
-            # y_hat_train, y_representation = model(X_batch_train, is_return_representation=True)
+            y_hat_train, y_representation = model(X_batch_train)
             # loss_CE = criterion(y_hat_train, labels_batch_train)
-            # if args.coef_contra_loss > 0:
-            #     # y_representation = torch.cat([y_representation.unsqueeze(1), y_representation.unsqueeze(1)], dim=1)
-            #     # y_representation = torch.cat([y_representation.unsqueeze(1),
-            #     #                               shuffle_within_labels(y_representation, labels_batch_train).unsqueeze(1)]
-            #     #                              , dim=1)
-            #     # f1, f2 = torch.split(y_representation, [bsz, bsz], dim=0)  # (bs, 128), (bs, 128)
-            #     # y_representation = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)  # (bs, 2, 128)
-            #     y_representation = y_representation.unsqueeze(1)
-            #     loss_SCL = criterion_SCL(y_representation, labels_batch_train)
-            #     # loss = criterion(y_hat_train.chunk(2, dim=0)[0], labels_batch_train) + args.coef_contra_loss * loss_SCL
-            #     loss = loss_CE + args.coef_contra_loss * loss_SCL
-            # else:
-            #     loss = loss_CE  #  criterion(y_hat_train, labels_batch_train) #
-            #
-
+            loss_CE = NEC_loss(y_hat_train, labels_batch_train)
+            if args.coef_contra_loss > 0:
+                # y_representation = torch.cat([y_representation.unsqueeze(1), y_representation.unsqueeze(1)], dim=1)
+                # y_representation = torch.cat([y_representation.unsqueeze(1),
+                #                               shuffle_within_labels(y_representation, labels_batch_train).unsqueeze(1)]
+                #                              , dim=1)
+                # f1, f2 = torch.split(y_representation, [bsz, bsz], dim=0)  # (bs, 128), (bs, 128)
+                # y_representation = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)  # (bs, 2, 128)
+                y_representation = y_representation.unsqueeze(1)
+                loss_SCL = criterion_SCL(y_representation, labels_batch_train)
+                # loss_SCL = criterion_SupNCE(y_representation, labels_batch_train)
+                # loss = criterion(y_hat_train.chunk(2, dim=0)[0], labels_batch_train) + args.coef_contra_loss * loss_SCL
+                loss = (1. - args.coef_contra_loss) * loss_CE + args.coef_contra_loss * loss_SCL
+            else:
+                loss = loss_CE  #  criterion(y_hat_train, labels_batch_train) #
             loss.backward()
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.5)  # args.clip) seems litte effect
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.5)  # args.clip) seems little effect
             optimizer.step()
 
             train_loss_batch = loss.item()
@@ -239,103 +229,73 @@ if args.mode == 'train':
         training_loss = np.mean(train_losses_batch)
         training_losses.append(training_loss)
 
-        if args.train_type == 'pretrain':
-            print('Epoch [{}/{}], Iter [{}/{}], training_loss: {:.5f}, '
-                  '{:.2f} sec/iter, {:.2f} iters/sec: '.
-                  format(epoch, args.epochs, i, iter_per_epoch,
-                         training_loss,
-                         tr.get_avg_time_per_iter(), tr.get_avg_iter_per_sec()))
-            tr.print_summary()
-        elif args.train_type == 'finetune':
-            with torch.no_grad():
-                val_losses_batch = []
-                model.eval()
-                predicted_prob_val = []
-                true_labels_val = []
-                for X_val_batch, labels_val_batch in val_loader:
-                    X_val_batch = X_val_batch.to(device)
-                    labels_val_batch = labels_val_batch.to(device)
-                    y_hat_val = model.forward_fine_tune(X_val_batch)
-                    val_loss_batch = criterion(y_hat_val, labels_val_batch).item()
-                    val_losses_batch.append(val_loss_batch)
-                    # predicted labels
-                    p_batch_val, _ = predict_labels(y_hat_val)
-                    predicted_prob_val.append(p_batch_val)
-                    true_labels_val.append(labels_val_batch)
+        with torch.no_grad():
+            val_losses_batch = []
+            model.eval()
+            predicted_prob_val = []
+            true_labels_val = []
+            for X_batch_val, labels_batch_val in val_loader:
+                X_batch_val = X_batch_val.to(device)
+                labels_batch_val = labels_batch_val.to(device)
+                y_hat_val, _ = model(X_batch_val)
+                # val_loss_batch = criterion(y_hat_val, labels_batch_val).item()
+                val_loss_batch = NEC_loss(y_hat_val, labels_batch_val).item()
+                val_losses_batch.append(val_loss_batch)
+                # predicted labels
+                # p_batch_val, _ = predict_labels(y_hat_val)
+                # predicted_prob_val.append(p_batch_val)
+                predicted_prob_val.append(y_hat_val)
+                true_labels_val.append(labels_batch_val)
 
-                validation_loss = np.mean(val_losses_batch)
-                validation_losses.append(validation_loss)
+            validation_loss = np.mean(val_losses_batch)
+            validation_losses.append(validation_loss)
 
-                predicted_prob_val = torch.cat(predicted_prob_val, dim=0)
-                true_labels_val = torch.cat(true_labels_val, dim=0)
-                predicted_prob_val_pos = (predicted_prob_val.cpu().detach().numpy())[:, 1]
-                true_labels_val = true_labels_val.cpu().detach().numpy()
-                val_result = metrics.print_metrics_binary(true_labels_val, predicted_prob_val_pos, verbose=0)
-                validation_results.append(val_result)
-                model.train()
+            predicted_prob_val = torch.cat(predicted_prob_val, dim=0)
+            true_labels_val = torch.cat(true_labels_val, dim=0)
+            predicted_prob_val_pos = (predicted_prob_val.cpu().detach().numpy())[:, 1]
+            # predicted_prob_val_pos = predicted_prob_val_pos[:, 1] * (1 - predicted_prob_val_pos[:, 0])
 
-            # if (epoch+1) % args.log_interval == 0: move into interation
-            print('Epoch [{}/{}], Iter [{}/{}], training_loss: {:.5f}, validation_loss: {:.5f}, '
-                  '{:.2f} sec/iter, {:.2f} iters/sec: '.
-                  format(epoch, args.epochs, i, iter_per_epoch,
-                         training_loss, validation_loss,
-                         tr.get_avg_time_per_iter(), tr.get_avg_iter_per_sec()))
+            true_labels_val = true_labels_val.cpu().detach().numpy()
+            val_result = metrics.print_metrics_binary(true_labels_val, predicted_prob_val_pos, verbose=0)
+            validation_results.append(val_result)
+            model.train()
 
-            tr.print_summary()
-            print(val_result)
+        # if (epoch+1) % args.log_interval == 0: move into interation
+        print('Epoch [{}/{}], {} Iters/Epoch, training_loss: {:.5f}, validation_loss: {:.5f}, '
+              '{:.2f} sec/iter, {:.2f} iters/sec: '.
+              format(epoch, args.epochs, iter_per_epoch,
+                     training_loss, validation_loss,
+                     tr.get_avg_time_per_iter(), tr.get_avg_iter_per_sec()))
+        tr.print_summary()
+        print(val_result)
 
-        if args.train_type == 'pretrain':
-            if args.save_every and epoch % args.save_every == 0:
-                # Set model checkpoint/saving path
-                model_final_name = model.say_name()
-                path = os.path.join('pytorch_states/' + model_final_name
-                                    + 'gclip1.5.bs{}.epoch{}.trainLoss{:.3f}-PreTrain.pt'.
-                                    format(args.batch_size, epoch, training_loss))
-                dirname = os.path.dirname(path)
-                if not os.path.exists(dirname):
-                    os.makedirs(dirname)
-                torch.save({
-                    'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'training_losses': training_losses,
-                    'validation_losses': [],
-                    'training_loss': training_loss,
-                    'validation_loss': None,
-                    'model_str': model.__str__(),
-                    'args:': args,
-                    'validation_result': None,
-                    'validation_results': []
-                }, path)
-        elif args.train_type == 'finetune':
-            if args.save_every and epoch % args.save_every == 0:
-                # Set model checkpoint/saving path
-                model_final_name = model.say_name()
-                path = os.path.join('pytorch_states/' + model_final_name
-                                    + 'gclip1.5.bs{}.epoch{}.trainLoss{:.3f}'
-                                      '.Val-finetune-CoefCL{}.Loss{:.3f}.ACC{:.3f}.AUROC{:.4f}.AUPRC{:.4f}.pt'.
-                                    format(args.batch_size, epoch, training_loss,
-                                           "{:.3f}".format(args.coef_contra_loss) if args.coef_contra_loss != 0 else "0",
-                                           validation_loss,
-                                           val_result['acc'], val_result['auroc'], val_result['auprc']))
-                dirname = os.path.dirname(path)
-                if not os.path.exists(dirname):
-                    os.makedirs(dirname)
-                torch.save({
-                    'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'training_losses': training_losses,
-                    'validation_losses': validation_losses,
-                    'training_loss': training_loss,
-                    'validation_loss': validation_loss,
-                    'model_str': model.__str__(),
-                    'args:': args,
-                    'validation_result': val_result,
-                    'validation_results': validation_results
-                }, path)
-                # print('Save ', path, ' done.')
-
+        if args.save_every and epoch % args.save_every == 0:
+            # Set model checkpoint/saving path
+            model_final_name = model.say_name()
+            path = os.path.join('pytorch_states/' + model_final_name
+                                + 'gclip1.5.bs{}.epoch{}.trainLoss{:.3f}'
+                                  '.Val-NCE+SCL-CoefCL{}.Loss{:.3f}.ACC{:.3f}.AUROC{:.4f}.AUPRC{:.4f}.pt'.
+                                format(args.batch_size, epoch, training_loss,
+                                       "{:.3f}".format(args.coef_contra_loss) if args.coef_contra_loss != 0 else "0",
+                                       validation_loss,
+                                       val_result['acc'], val_result['auroc'], val_result['auprc']))
+            dirname = os.path.dirname(path)
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'training_losses': training_losses,
+                'validation_losses': validation_losses,
+                'training_loss': training_loss,
+                'validation_loss': validation_loss,
+                'model_str': model.__str__(),
+                'args:': args,
+                'validation_result': val_result,
+                'validation_results': validation_results
+            }, path)
+            # print('Save ', path, ' done.')
 
     print('Training complete...')
     try:
@@ -362,6 +322,7 @@ if args.mode == 'train':
     except ValueError:
         print("Error in Plotting validation auroc values over epochs")
 
+
 elif args.mode == 'test':
     print('Beginning testing...')
     start_time = time.time()
@@ -387,20 +348,22 @@ elif args.mode == 'test':
     true_labels = []
     with torch.no_grad():
         for X_batch, y_batch in tqdm(test_loader):
-            y_hat_batch = model.forward_fine_tune(X_batch)
+            y_hat_batch, _ = model(X_batch)
             # loss = criterion(y_hat, y_batch)
-            p_batch, _ = predict_labels(y_hat_batch)
-            predicted_prob.append(p_batch)
+            # p_batch, _ = predict_labels(y_hat_batch)
+            # predicted_prob.append(p_batch)
+            predicted_prob.append(y_hat_batch)
             true_labels.append(y_batch)
         predicted_prob = torch.cat(predicted_prob, dim=0)
         true_labels = torch.cat(true_labels, dim=0) # with threshold 0.5, not used here
 
     predictions = (predicted_prob.cpu().detach().numpy())[:, 1]
+    # predictions = predictions[:, 1] * (1-predictions[:, 0])
     true_labels = true_labels.cpu().detach().numpy()
     test_results = metrics.print_metrics_binary(true_labels, predictions)
     print(test_results)
     # path = os.path.join(args.output_dir, "test_predictions", os.path.basename(args.load_state)) + ".csv"
-    path = os.path.join("test_predictions", os.path.basename(args.load_state)) + ".csv"
+    path = os.path.join("../test_predictions", os.path.basename(args.load_state)) + ".csv"
     utils.save_results(names, predictions, true_labels, path)
     h_, m_, s_ = TimeReport._hms(time.time() - start_time)
     print('Testing elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))
@@ -408,29 +371,4 @@ elif args.mode == 'test':
 else:
     raise ValueError("Wrong value for args.mode")
 
-# print("==> using model {}".format(args.network))
-# model_module = imp.load_source(os.path.basename(args.network), args.network)
-# model = model_module
-# suffix = ".bs{}{}{}.ts{}{}".format(args.batch_size,
-#                                    ".L1{}".format(args.l1) if args.l1 > 0 else "",
-#                                    ".L2{}".format(args.l2) if args.l2 > 0 else "",
-#                                    args.timestep,
-#                                    ".trc{}".format(args.target_repl_coef) if args.target_repl_coef > 0 else "")
-# model.final_name = args.prefix + model.say_name() + suffix
-# print("==> model.final_name:", model.final_name)
-
-#
-# if target_repl:
-#     T = train_raw[0][0].shape[0]
-#
-#     def extend_labels(data):
-#         data = list(data)
-#         labels = np.array(data[1])  # (B,)
-#         data[1] = [labels, None]
-#         data[1][1] = np.expand_dims(labels, axis=-1).repeat(T, axis=1)  # (B, T)
-#         data[1][1] = np.expand_dims(data[1][1], axis=-1)  # (B, T, 1)
-#         return data
-#
-#     train_raw = extend_labels(train_raw)
-#     val_raw = extend_labels(val_raw)
 

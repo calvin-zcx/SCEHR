@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser()
 common_utils.add_common_arguments(parser)
 parser.add_argument('--target_repl_coef', type=float, default=0.0)
 parser.add_argument('--data', type=str, help='Path to the data of in-hospital mortality task',
-                    default=os.path.join(os.path.dirname(__file__), '../../data/in-hospital-mortality/'))
+                    default=os.path.join(os.path.dirname(__file__), '../../../data/in-hospital-mortality/'))
 parser.add_argument('--output_dir', type=str, help='Directory relative which all output files are stored',
                     default='.')
 # New added
@@ -95,8 +95,9 @@ torch.manual_seed(args.seed)
 
 # Build the model
 if args.network == "lstm":
-    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=2,
-                dropout=args.dropout, target_repl=False, deep_supervision=False, task='ihm')
+    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=1,
+                    dropout=args.dropout, target_repl=False, deep_supervision=False, task='ihm',
+                    final_act=nn.Identity())
 else:
     raise NotImplementedError
 
@@ -108,6 +109,7 @@ else:
     criterion_SCL = SupConLoss(temperature=0.1)   # temperature=0.01)  # temperature=opt.temp
     criterion_SupNCE = SupNCELoss(temperature=1)
     criterion_MCE = nn.CrossEntropyLoss()
+    criterion_BCElogit = nn.BCEWithLogitsLoss()
 
     def CBCE_loss(y_pre, y):
         # contrastive binary cross entropy loss
@@ -204,7 +206,7 @@ if args.mode == 'train':
             bsz = labels_batch_train.shape[0]
 
             y_hat_train, y_representation = model(X_batch_train)
-            loss_CE = CBCE_loss(y_hat_train, labels_batch_train)  # loss_CE = criterion(y_hat_train, labels_batch_train)
+            loss_CE = criterion_BCElogit(y_hat_train, labels_batch_train)  # loss_CE = criterion(y_hat_train, labels_batch_train)
             if args.coef_contra_loss > 0:
 
                 y_representation = y_representation.unsqueeze(1)
@@ -236,7 +238,7 @@ if args.mode == 'train':
                 labels_batch_val = labels_batch_val.to(device)
                 y_hat_val, _ = model(X_batch_val)
                 # val_loss_batch = criterion(y_hat_val, labels_batch_val).item()
-                val_loss_batch = CBCE_loss(y_hat_val, labels_batch_val).item()
+                val_loss_batch = criterion_BCElogit(y_hat_val, labels_batch_val).item()
                 val_losses_batch.append(val_loss_batch)
                 # predicted labels
                 # p_batch_val, _ = predict_labels(y_hat_val)
@@ -248,9 +250,9 @@ if args.mode == 'train':
             validation_losses.append(validation_loss)
 
             predicted_prob_val = torch.cat(predicted_prob_val, dim=0)
+            predicted_prob_val = nn.Sigmoid()(predicted_prob_val)
             true_labels_val = torch.cat(true_labels_val, dim=0)
-            predicted_prob_val = predicted_prob_val / predicted_prob_val.sum(dim=1, keepdim=True)
-            predicted_prob_val_pos = (predicted_prob_val.cpu().detach().numpy())[:, 1]
+            predicted_prob_val_pos = (predicted_prob_val.cpu().detach().numpy())
             # predicted_prob_val_pos = predicted_prob_val_pos[:, 1] * (1 - predicted_prob_val_pos[:, 0])
 
             true_labels_val = true_labels_val.cpu().detach().numpy()
@@ -277,8 +279,8 @@ if args.mode == 'train':
             predicted_prob_test = torch.cat(predicted_prob_test, dim=0)
             true_labels_test = torch.cat(true_labels_test, dim=0)  # with threshold 0.5, not used here
 
-            predicted_prob_test = predicted_prob_test / predicted_prob_test.sum(dim=1, keepdim=True)
-            predictions_test = (predicted_prob_test.cpu().detach().numpy())[:, 1]
+            predicted_prob_test = nn.Sigmoid()(predicted_prob_test)
+            predictions_test = (predicted_prob_test.cpu().detach().numpy())
             # predictions = predictions[:, 1] * (1-predictions[:, 0])
             true_labels_test = true_labels_test.cpu().detach().numpy()
             print('test results:')
@@ -299,8 +301,8 @@ if args.mode == 'train':
             # Set model checkpoint/saving path
             model_final_name = model.say_name()
             path = os.path.join('pytorch_states/' + model_final_name
-                                + '.bs{}.epo{}.trLos{:.2f}.CBCE+SCL-Coef{}.'
-                                  'Val-Los{:.3f}.ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.'
+                                + '.bs{}.epo{}.trLos{:.2f}.BCELogits+SCL-Coef{}.'
+                                  'Val-Los{:.2f}.ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.'
                                   'Tst-ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.pt'.
                                 format(args.batch_size, epoch, training_loss,
                                        "{:.3f}".format(args.coef_contra_loss) if args.coef_contra_loss != 0 else "0",
@@ -354,7 +356,6 @@ if args.mode == 'train':
     except ValueError:
         print("Error in Plotting validation auroc values over epochs")
 
-
 elif args.mode == 'test':
     print('Beginning testing...')
     start_time = time.time()
@@ -391,14 +392,14 @@ elif args.mode == 'test':
         predicted_prob = torch.cat(predicted_prob, dim=0)
         true_labels = torch.cat(true_labels, dim=0) # with threshold 0.5, not used here
 
-    predicted_prob = predicted_prob / predicted_prob.sum(dim=1, keepdim=True)
-    predictions = (predicted_prob.cpu().detach().numpy())[:, 1]
+    predicted_prob = nn.Sigmoid()(predicted_prob)
+    predictions = (predicted_prob.cpu().detach().numpy())
     # predictions = predictions[:, 1] * (1-predictions[:, 0])
     true_labels = true_labels.cpu().detach().numpy()
     test_results = metrics.print_metrics_binary(true_labels, predictions)
     print(test_results)
     # path = os.path.join(args.output_dir, "test_predictions", os.path.basename(args.load_state)) + ".csv"
-    path = os.path.join("test_predictions", os.path.basename(args.load_state)) + ".csv"
+    path = os.path.join("../test_predictions", os.path.basename(args.load_state)) + ".csv"
     utils.save_results(names, predictions, true_labels, path)
     h_, m_, s_ = TimeReport._hms(time.time() - start_time)
     print('Testing elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))
