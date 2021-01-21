@@ -54,7 +54,6 @@ def generate_grid_search_CBCE_cmd():
     v_decay = [0, ]  #, 1e-5, 1e-4, 1e-3]  try to fix the effect of weight decay
     with open('CBCE.cmd', 'w') as f:
         for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
-            # 2>&1 | tee log/MCE+SCL_hasstatic_a0_bs256_new.log"
             cmd = "echo $LINENO && python main_CBCE.py --network lstm  " \
                   "--dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --cuda --save_every 0 --epochs 100 " \
                   "--coef_contra_loss {}  --batch_size {} --weight_decay {} " \
@@ -88,7 +87,6 @@ def generate_grid_search_MCE_cmd():
     v_decay = [0, ]  #, 1e-5, 1e-4, 1e-3]  try to fix the effect of weight decay
     with open('MCE.cmd', 'w') as f:
         for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
-            # 2>&1 | tee log/MCE+SCL_hasstatic_a0_bs256_new.log"
             cmd = "python main_MCE.py --network lstm  " \
                   "--dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --cuda --save_every 0 --epochs 100 " \
                   "--coef_contra_loss {}  --batch_size {} --weight_decay {} " \

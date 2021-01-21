@@ -4,16 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="no weight decay, more alpha">
-      <change afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/old_code/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/old_code/main_MCE_old.py" afterDir="false" />
+    <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="MCE">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/old_code/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCEwithlogit.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/old_code/main_BCEwithlogit.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE_old.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/old_code/main_CBCE_old.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_MCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_MCE.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_NCE_woTest.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/old_code/main_NCE_woTest.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_pretrain_finetune.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/old_code/main_pretrain_finetune.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -221,7 +213,7 @@
       <workItem from="1609363799607" duration="232734000" />
       <workItem from="1610988306735" duration="65099000" />
       <workItem from="1611162810485" duration="5351000" />
-      <workItem from="1611192679517" duration="6970000" />
+      <workItem from="1611192679517" duration="8542000" />
     </task>
     <task id="LOCAL-00001" summary="not include pytorch states">
       <created>1608521605396</created>
@@ -349,7 +341,14 @@
       <option name="project" value="LOCAL" />
       <updated>1611166680958</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="MCE">
+      <created>1611200786613</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1611200786613</updated>
+    </task>
+    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -384,7 +383,8 @@
     <MESSAGE value="get_loss, deal with small batch" />
     <MESSAGE value="re order name a, bs, decay" />
     <MESSAGE value="no weight decay, more alpha" />
-    <option name="LAST_COMMIT_MESSAGE" value="no weight decay, more alpha" />
+    <MESSAGE value="MCE" />
+    <option name="LAST_COMMIT_MESSAGE" value="MCE" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
