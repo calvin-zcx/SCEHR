@@ -183,6 +183,7 @@ if args.mode == 'train':
     train_dataset = Dataset(train_raw['data'][0], train_raw['data'][1], train_raw['names'])
     valid_dataset = Dataset(val_raw['data'][0], val_raw['data'][1], val_raw['names'])
     test_dataset = Dataset(test_raw['data'][0], test_raw['data'][1], test_raw['names'])
+    # np.array(train_raw['data'][1]).mean() # ratio of positive cases
 
     train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, drop_last=False, shuffle=True)
     val_loader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, drop_last=False, shuffle=False)
