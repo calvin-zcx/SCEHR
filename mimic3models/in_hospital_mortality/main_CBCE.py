@@ -353,6 +353,7 @@ if args.mode == 'train':
 elif args.mode == 'test':
     print('Beginning testing...')
     start_time = time.time()
+    boostrap = True
     # ensure that the code uses test_reader
     model.to(torch.device('cpu'))
 
@@ -391,6 +392,27 @@ elif args.mode == 'test':
     true_labels = true_labels.cpu().detach().numpy()
     test_results = metrics.print_metrics_binary(true_labels, predictions)
     print(test_results)
+    print('Format print :.4f for results:')
+
+    def format_print(dict):
+        print("AUC of ROC = {:.4f}".format(dict['auroc']))
+        print("AUC of PRC = {:.4f}".format(dict['auprc']))
+        print("accuracy = {:.4f}".format(dict['acc']))
+        print("min(+P, Se) = {:.4f}".format(dict['minpse']))
+        print("precision class 0 = {:.4f}".format(dict['prec0']))
+        print("precision class 1 = {:.4f}".format(dict['prec1']))
+        print("recall class 0 = {:.4f}".format(dict['rec0']))
+        print("recall class 1 = {:.4f}".format(dict['rec1']))
+    format_print(test_results)
+
+    if boostrap:
+        from utils import boostrap_interval_and_std
+
+        pd_bst = boostrap_interval_and_std(predictions, true_labels, 100)
+        pd.set_option('display.max_columns', None)
+        pd.set_option("precision", 4)
+        print(pd_bst.describe())
+
     path = os.path.join("test_predictions", os.path.basename(args.load_state)) + ".csv"
     utils.save_results(names, predictions, true_labels, path)
     h_, m_, s_ = TimeReport._hms(time.time() - start_time)

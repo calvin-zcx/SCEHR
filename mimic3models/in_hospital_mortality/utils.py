@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-from mimic3models import common_utils
+from mimic3models import common_utils, metrics
 import numpy as np
 import os
 import itertools
@@ -131,8 +131,29 @@ def summarize_results_from_csv_files(dir, f_cond=None, out_file=None):
     print('Dump ', fo, 'done!')
 
 
-def boostrap_interval_and_std():
-    pass
+def boostrap_interval_and_std(y_pre, y_true,  n_bootstraps=100, path=None):
+    assert  len(y_pre) == len(y_true)
+    n = len(y_true)
+    results = []
+    for i in range(n_bootstraps):
+        # bootstrap by sampling with replacement on the prediction indices
+        idx = np.random.choice(n, n)
+        r = metrics.print_metrics_binary(y_true[idx], y_pre[idx], verbose=0)
+        results.append(r)
+
+    results_dict = {
+        'auroc': [x['auroc'] for x in results],
+        'auprc': [x['auprc'] for x in results],
+        'acc': [x['acc'] for x in results],
+        'minpse': [x['minpse'] for x in results],
+        'prec0': [x['prec0'] for x in results],
+        'prec1': [x['prec1'] for x in results],
+        'rec0': [x['rec0'] for x in results],
+        'rec1': [x['rec1'] for x in results],
+    }
+    pd_r = pd.DataFrame(data=results_dict)
+    # pd_r.to_csv(path + '.csv')
+    return pd_r
 
 
 if __name__ == "__main__":

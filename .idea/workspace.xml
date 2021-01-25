@@ -6,7 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/final_selected.cmd" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/final_selected.cmd" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_MCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_MCE.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -23,6 +26,14 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitSEFilterConfiguration">
+    <file-type-list>
+      <filtered-out-file-type name="LOCAL_BRANCH" />
+      <filtered-out-file-type name="REMOTE_BRANCH" />
+      <filtered-out-file-type name="TAG" />
+      <filtered-out-file-type name="COMMIT_BY_MESSAGE" />
+    </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$USER_HOME$/Anaconda3/envs/mimicCL/Lib/site-packages/torch/nn/modules/linear.py" root0="FORCE_HIGHLIGHTING" />
@@ -52,7 +63,7 @@
       <recent name="C:\Users\zangc\PycharmProjects\EHRCL\mimic3models\in_hospital_mortality\old_code" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.main_BCE">
+  <component name="RunManager" selected="Python.main_MCE">
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -79,9 +90,6 @@
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
       <option name="IS_MODULE_SDK" value="true" />
@@ -89,7 +97,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_BCE.py" />
-      <option name="PARAMETERS" value="--network lstm  --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --batch_size 128 --coef_contra_loss 0.0025  --cuda --epochs 50" />
+      <option name="PARAMETERS" value="--network lstm --load_state pytorch_states/final_selected_linux/BCE/LSTM.i76.h16.L2.c1.D0.3.BCE+SCL.a0.009.bs1024.wdcy0.0.epo68.TrLos0.37.VaLos0.40.ACC0.878.ROC0.8513.PRC0.5269.TstACC0.892.ROC0.8584.PRC0.4888.pt   --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode test --batch_size 200 --coef_contra_loss 0.009" />
       <option name="SHOW_COMMAND_LINE" value="true" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -123,9 +131,6 @@
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
       <option name="IS_MODULE_SDK" value="true" />
@@ -133,7 +138,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" />
-      <option name="PARAMETERS" value="--network lstm  --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --batch_size 64 --coef_contra_loss 0.0025 --cuda --epochs 50 --weight_decay 1e-5" />
+      <option name="PARAMETERS" value="--network lstm --load_state pytorch_states/final_selected_linux/CBCE/LSTM.i76.h16.L2.c2.D0.3.CBCE+SCL.a0.0025.bs256.wdcy0.0.epo37.TrLos0.29.VaLos0.31.ACC0.886.ROC0.8543.PRC0.5485.TstACC0.897.ROC0.8599.PRC0.5042.pt --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode test --batch_size 200 --coef_contra_loss 0.0025" />
       <option name="SHOW_COMMAND_LINE" value="true" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -145,9 +150,6 @@
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
       <option name="IS_MODULE_SDK" value="true" />
@@ -155,7 +157,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_MCE.py" />
-      <option name="PARAMETERS" value="--network lstm  --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --batch_size 128 --coef_contra_loss 0.01 --cuda --epochs 50 --weight_decay 0" />
+      <option name="PARAMETERS" value="--network lstm --load_state pytorch_states/final_selected_linux/MCE/LSTM.i76.h16.L2.c2.D0.3.MCE+SCL.a0.0025.bs512.wdcy0.0.epo72.TrLos0.28.VaLos0.32.ACC0.887.ROC0.8527.PRC0.5545.TstACC0.893.ROC0.8598.PRC0.5014.pt --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode test --batch_size 200 --coef_contra_loss 0.0025" />
       <option name="SHOW_COMMAND_LINE" value="true" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -194,10 +196,10 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.main_BCE" />
-        <item itemvalue="Python.utils" />
         <item itemvalue="Python.main_MCE" />
         <item itemvalue="Python.main_CBCE" />
+        <item itemvalue="Python.main_BCE" />
+        <item itemvalue="Python.utils" />
         <item itemvalue="Python.main_BCEwithlogit" />
       </list>
     </recent_temporary>
@@ -221,7 +223,7 @@
       <workItem from="1611162810485" duration="5351000" />
       <workItem from="1611192679517" duration="23513000" />
       <workItem from="1611282830926" duration="1995000" />
-      <workItem from="1611370871141" duration="7048000" />
+      <workItem from="1611370871141" duration="19328000" />
     </task>
     <task id="LOCAL-00001" summary="not include pytorch states">
       <created>1608521605396</created>
@@ -370,7 +372,14 @@
       <option name="project" value="LOCAL" />
       <updated>1611542024423</updated>
     </task>
-    <option name="localTasksCounter" value="22" />
+    <task id="LOCAL-00022" summary="MCE">
+      <created>1611543885828</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1611543885828</updated>
+    </task>
+    <option name="localTasksCounter" value="23" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
