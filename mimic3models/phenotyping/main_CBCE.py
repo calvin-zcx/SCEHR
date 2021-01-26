@@ -16,9 +16,10 @@ from mimic3models import common_utils
 import torch
 import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
-from torch.utils.data import DataLoader, Dataset, TensorDataset
+# from torch.utils.data import DataLoader, Dataset, TensorDataset
 from mimic3models.pytorch_models.lstm import LSTM_PT
-from mimic3models.pytorch_models.losses import SupConLoss_MultiLabel, SupNCELoss, CBCE_loss, CBCE_WithLogitsLoss
+from mimic3models.pytorch_models.losses import SupConLoss_MultiLabel, CBCE_WithLogitsLoss_multilabel
+# SupNCELoss, CBCE_loss, CBCE_WithLogitsLoss
 from tqdm import tqdm
 from mimic3models.time_report import TimeReport
 from mimic3models.pytorch_models.torch_utils import Dataset, optimizer_to, model_summary, TimeDistributed, shuffle_within_labels,shuffle_time_dim
@@ -107,8 +108,9 @@ print('Using device: ', device)
 
 # Build the model
 if args.network == "lstm":
-    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=25,
-                    dropout=args.dropout, target_repl=False, deep_supervision=False, task='ph')
+    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=25 * 2,
+                    dropout=args.dropout, target_repl=False, deep_supervision=False, task='ph',
+                    final_act=nn.Identity())
 else:
     raise NotImplementedError
 
@@ -116,12 +118,12 @@ else:
 if target_repl:
     raise NotImplementedError
 else:
-    criterion_BCE = nn.BCELoss()
+    # criterion_BCE = nn.BCELoss()
     criterion_SCL_MultiLabel = SupConLoss_MultiLabel(temperature=0.1)   # temperature=0.01)  # temperature=opt.temp
 
     def get_loss(y_pre, labels, representation, alpha=0):
         # CBCE_WithLogitsLoss is more numerically stable than CBCE_Loss when model is complex/overfitting
-        loss = criterion_BCE(y_pre, labels)
+        loss = CBCE_WithLogitsLoss_multilabel(y_pre, labels)
         if alpha > 0:
             if len(representation.shape) == 2:
                 representation = representation.unsqueeze(1)

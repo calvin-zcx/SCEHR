@@ -126,21 +126,42 @@ def save_results(names, ts, predictions, labels, path):
             f.write(line + '\n')
 
 
+# def generate_grid_search_BCE_cmd():
+#     v_a = [0, 0.001,  0.002,
+#            0.003,  0.004,
+#            0.005, 0.006, 0.007,
+#            0.008, 0.009, 0.01]
+#     v_bs = [256, 512, 1024] #64, 128,
+#     v_decay = [0, ]  #, 1e-5, 1e-4, 1e-3]  try to fix the effect of weight decay
+#     with open('BCE.cmd', 'w') as f:
+#         for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
+#             cmd = "python main_BCE.py --network lstm  --dim 256 --timestep 1.0 --depth 1 --dropout 0.3 " \
+#                   "--mode train --cuda --save_every 1 --epochs 50  " \
+#                   "--coef_contra_loss {} --batch_size {} --weight_decay {} " \
+#                   "2>&1 | tee log_BCE/BCE+SCL_cmd_a{}.bs{}.weDcy{}.log\n".format(a, bs, decay, a, bs, decay)
+#             f.write(cmd)
+
+
 def generate_grid_search_BCE_cmd():
+    v_bs = [256, 512, 1024]  # 64, 128,
     v_a = [0, 0.001,  0.002,
            0.003,  0.004,
            0.005, 0.006, 0.007,
            0.008, 0.009, 0.01]
-    v_bs = [256, 512, 1024] #64, 128,
     v_decay = [0, ]  #, 1e-5, 1e-4, 1e-3]  try to fix the effect of weight decay
     with open('BCE.cmd', 'w') as f:
-        for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
+        for bs, a, decay in itertools.product(v_bs, v_a, v_decay):
+            if bs <= 256:
+                epoc = 60
+            elif bs <= 512:
+                epoc = 70
+            else:
+                epoc = 80
             cmd = "python main_BCE.py --network lstm  --dim 256 --timestep 1.0 --depth 1 --dropout 0.3 " \
-                  "--mode train --cuda --save_every 1 --epochs 50  " \
-                  "--coef_contra_loss {} --batch_size {} --weight_decay {} " \
-                  "2>&1 | tee log_BCE/BCE+SCL_cmd_a{}.bs{}.weDcy{}.log\n".format(a, bs, decay, a, bs, decay)
+                  "--mode train --cuda --save_every 1 --epochs {}  " \
+                  "--batch_size {} --coef_contra_loss {} --weight_decay {} " \
+                  "2>&1 | tee log_BCE/BCE+SCL_cmd_bs{}.a{}.weDcy{}.log\n".format(epoc, bs, a, decay, bs, a, decay)
             f.write(cmd)
-
 
 if __name__ == "__main__":
 

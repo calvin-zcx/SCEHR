@@ -184,50 +184,104 @@ class SupNCELoss(nn.Module):
         return loss
 
 
-def CBCE_WithLogitsLoss(wx, y): #, is_stable=True):
+def CBCE_WithLogitsLoss_separate(wx_pos, wx_neg, y): #, is_stable=True):
     # contrastive binary cross entropy loss
-    # wx: (bs, 2), after sigmoid
+    # wx_pos: (bs, 1), before sigmoid
+    # wx_neg: (bs, 1), before sigmoid
     # y: (bs,)
-
-    pos_part = F.binary_cross_entropy_with_logits(wx[:, 1], y)
-    neg_part = F.binary_cross_entropy_with_logits(wx[:, 0], 1.-y)
+    pos_part = F.binary_cross_entropy_with_logits(wx_pos, y)
+    neg_part = F.binary_cross_entropy_with_logits(wx_neg, 1.-y)
     ret = (pos_part + neg_part)/2.0
     return ret
 
 
-def CBCE_loss(y_pre, y):
+def CBCE_WithLogitsLoss(wx, y):
+    # wx: (bs, 2), before sigmoid
+    # y: (bs,)
+    return CBCE_WithLogitsLoss_separate(wx[:, 1], wx[:, 0], y)
+
+#
+# def CBCE_WithLogitsLoss(wx, y): #, is_stable=True):
+#     # contrastive binary cross entropy loss
+#     # wx: (bs, 2), before sigmoid
+#     # y: (bs,)
+#
+#     pos_part = F.binary_cross_entropy_with_logits(wx[:, 1], y)
+#     neg_part = F.binary_cross_entropy_with_logits(wx[:, 0], 1.-y)
+#     ret = (pos_part + neg_part)/2.0
+#     return ret
+
+
+def CBCE_loss_separate(y_pre_pos, y_pre_neg, y):
     # contrastive binary cross entropy loss
-    # y_pre: (bs, 2), after sigmoid
+    # y_pre_pos: (bs, 1), after sigmoid
+    # y_pre_neg: (bs, 1), after sigmoid
     # y: (bs,)
     i1 = (y == 1)
     i0 = (y == 0)
-    pos_anchor = y_pre[i1, 1].log() + (1. - y_pre[i1, 0]).log()
-    neg_anchor = y_pre[i0, 0].log() + (1. - y_pre[i0, 1]).log()
-    # pos_anchor = (y_pre[i1, 1] * (1. - y_pre[i1, 0])).log()
-    # neg_anchor = (y_pre[i0, 0] * (1. - y_pre[i0, 1])).log()
+    pos_anchor = y_pre_pos[i1].log() + (1. - y_pre_neg[i1]).log()
+    neg_anchor = y_pre_neg[i0].log() + (1. - y_pre_pos[i0]).log()
     ret = -torch.cat([pos_anchor, neg_anchor]).mean()/2.0
     return ret
 
 
-def test_CBCE_loss(n):
-    n = 5
-    wx = torch.randn(n, 2)
-    y = torch.empty(n).random_(2)
-    y_pre = torch.sigmoid(wx)
-    l1 = CBCE_loss(y_pre, y)
-    l2 = CBCE_WithLogitsLoss(wx, y)
-    return l1, l2
+def CBCE_loss(y_pre, y):
+    # y_pre: (bs, 2), after sigmoid
+    # y: (bs,)
+    return CBCE_loss_separate(y_pre[:, 1], y_pre[:, 0], y)
 
 
-def criterion_SCL_multilabel(SCL, features, labels):
-    assert len(labels.shape) == 2
+# def CBCE_loss(y_pre, y):
+#     # contrastive binary cross entropy loss
+#     # y_pre: (bs, 2), after sigmoid
+#     # y: (bs,)
+#     i1 = (y == 1)
+#     i0 = (y == 0)
+#     pos_anchor = y_pre[i1, 1].log() + (1. - y_pre[i1, 0]).log()
+#     neg_anchor = y_pre[i0, 0].log() + (1. - y_pre[i0, 1]).log()
+#     # pos_anchor = (y_pre[i1, 1] * (1. - y_pre[i1, 0])).log()
+#     # neg_anchor = (y_pre[i0, 0] * (1. - y_pre[i0, 1])).log()
+#     ret = -torch.cat([pos_anchor, neg_anchor]).mean()/2.0
+#     return ret
+
+
+def CBCE_loss_multilabel(y_pre, y):
+    # x: (bs, 2*C), after sigmoid
+    # y: (bs, C)
+    assert len(y.shape) == 2
     losses = []
-    for j in range(labels.shape[1]):
-        y = labels[:, j]
-        if y.sum().item() > 1:
-            losses.append(SCL(features, y))
-    r = torch.mean(torch.stack(losses))
-    return r
+    y_pre_pos, y_pre_neg = torch.chunk(y_pre, 2, dim=1)
+    C = y_pre_pos.shape[1]
+    for c in range(C):
+        ret = CBCE_loss_separate(y_pre_pos[:, c], y_pre_neg[:, c], y[:,c])
+        losses.append(ret)
+    loss = torch.mean(torch.stack(losses))
+    return loss
+
+
+def CBCE_WithLogitsLoss_multilabel(wx, y):
+    # wx: (bs, 2*C), before sigmoid
+    # y: (bs, C)
+    assert len(y.shape) == 2
+    losses = []
+    wx_pos, wx_neg = torch.chunk(wx, 2, dim=1)
+    C = wx_pos.shape[1]
+    for c in range(C):
+        ret = CBCE_WithLogitsLoss_separate(wx_pos[:, c], wx_neg[:, c],  y[:, c])
+        losses.append(ret)
+    loss = torch.mean(torch.stack(losses))
+    return loss
+
+
+# def criterion_SCL_multilabel(SCL, features, labels):
+#     assert len(labels.shape) == 2
+#     losses = []
+#     for j in range(labels.shape[1]):
+#         y = labels[:, j]
+#         if y.sum().item() > 1:
+#             losses.append(SCL(features, y))
+#     r = torch.mean(torch.stack(losses))
+#     return r
 
 
 class SupConLoss_MultiLabel(nn.Module):
@@ -253,3 +307,21 @@ class SupConLoss_MultiLabel(nn.Module):
                       'Not Supervised Contrastive Regularizer for this batch'.format(j))
         l = torch.mean(torch.stack(losses))
         return l
+
+
+def test_CBCE_loss(n=5):
+    wx = torch.randn(n, 2)
+    y = torch.empty(n).random_(2)
+    y_pre = torch.sigmoid(wx)
+    l1 = CBCE_loss(y_pre, y)
+    l2 = CBCE_WithLogitsLoss(wx, y)
+    return l1, l2
+
+
+def test_CBCE_multilabel_loss(n=5, c=2):
+    wx = torch.randn(n, c*2)
+    y = torch.empty(n, c).random_(2)
+    y_pre = torch.sigmoid(wx)
+    l1 = CBCE_loss_multilabel(y_pre, y)
+    l2 = CBCE_WithLogitsLoss_multilabel(wx, y)
+    return l1, l2
