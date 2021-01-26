@@ -217,3 +217,39 @@ def test_CBCE_loss(n):
     l1 = CBCE_loss(y_pre, y)
     l2 = CBCE_WithLogitsLoss(wx, y)
     return l1, l2
+
+
+def criterion_SCL_multilabel(SCL, features, labels):
+    assert len(labels.shape) == 2
+    losses = []
+    for j in range(labels.shape[1]):
+        y = labels[:, j]
+        if y.sum().item() > 1:
+            losses.append(SCL(features, y))
+    r = torch.mean(torch.stack(losses))
+    return r
+
+
+class SupConLoss_MultiLabel(nn.Module):
+    """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
+    It also supports the unsupervised contrastive loss in SimCLR"""
+    def __init__(self, temperature=0.07, contrast_mode='all',
+                 base_temperature=0.07):
+        super(SupConLoss_MultiLabel, self).__init__()
+        self.scl = SupConLoss(temperature, contrast_mode, base_temperature)
+        self.temperature = temperature
+        self.contrast_mode = contrast_mode
+        self.base_temperature = base_temperature
+
+    def forward(self, features, labels=None, mask=None):
+        assert len(labels.shape) == 2
+        losses = []
+        for j in range(labels.shape[1]):
+            y = labels[:, j]
+            if y.sum().item() > 1:
+                losses.append(self.scl(features, y))
+            else:
+                print('Warning: #Positive < 2 for {}^th dim label. '
+                      'Not Supervised Contrastive Regularizer for this batch'.format(j))
+        l = torch.mean(torch.stack(losses))
+        return l

@@ -99,7 +99,7 @@ torch.manual_seed(args.seed)
 
 # Build the model
 if args.network == "lstm":
-    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=25,
+    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=25*2,
                 dropout=args.dropout, target_repl=False, deep_supervision=False, task='ph')
 else:
     raise NotImplementedError
@@ -113,7 +113,42 @@ if target_repl:
     raise NotImplementedError
 else:
     criterion = nn.BCELoss()  # nn.CrossEntropyLoss()
-    criterion_SCL = SupConLoss()  # temperature=0.01)  # temperature=opt.temp
+    criterion_SCL = SupConLoss() #temperature=0.01)  # temperature=opt.temp
+
+    def NEC_loss_multilabel(y_pre, y):
+        # x: (bs, 2*C), after sigmoid
+        # y: (bs, C)
+        assert len(y.shape) == 2
+        losses = []
+        y_pre_pos, y_pre_neg = torch.chunk(y_pre, 2, dim=1)
+        C = y_pre_pos.shape[1]
+        for c in range(C):
+            i1 = (y[:,c]==1)
+            i0 = (y[:,c]==0)
+            pos_anchor = y_pre_pos[i1, c].log() + (1.-y_pre_neg[i1, c]).log()
+            neg_anchor = y_pre_neg[i0, c].log() + (1.-y_pre_pos[i0, c]).log()
+            ret = -torch.cat([pos_anchor, neg_anchor]).mean()
+            losses.append(ret)
+        loss = torch.mean(torch.stack(losses))
+        return loss
+
+    # def NEC_loss_multilabel(y_pre, y):
+    #     # x: (bs, 2*C), after sigmoid
+    #     # y: (bs, C)
+    #     assert len(y.shape) == 2
+    #     losses = []
+    #     y_pre_pos, y_pre_neg = torch.chunk(y_pre, 2, dim=1)
+    #     C = y_pre_pos.shape[1]
+    #     for c in range(C):
+    #         i1 = (y[:,c]==1)
+    #         i0 = (y[:,c]==0)
+    #         pos_anchor = y_pre_pos[i1, c].log() + (1.-y_pre_neg[i1, c]).log()
+    #         neg_anchor = y_pre_neg[i0, c].log() + (1.-y_pre_pos[i0, c]).log()
+    #         # ret = -torch.cat([pos_anchor, neg_anchor]).mean()
+    #         ret = -(pos_anchor.mean() + neg_anchor.mean()) / 2.
+    #         losses.append(ret)
+    #     loss = torch.mean(torch.stack(losses))
+    #     return loss
 
     def criterion_SCL_multilabel(SCL, features, labels, mask=None):
         assert len(labels.shape) == 2
@@ -124,6 +159,7 @@ else:
                 losses.append(SCL(features, y))
         mean = torch.mean(torch.stack(losses))
         return mean
+
 
 # set lr and weight_decay later # or use other optimization say adamW later?
 optimizer = torch.optim.Adam(model.parameters(),  lr=1e-3, weight_decay=0) # 1e-4)
@@ -202,7 +238,8 @@ if args.mode == 'train':
             # X_batch_train = torch.cat([X_batch_train, X_batch_aug], dim=0)
             #
             y_hat_train, y_representation = model(X_batch_train)
-            loss_CE = criterion(y_hat_train, labels_batch_train)
+            # loss_CE = criterion(y_hat_train, labels_batch_train)
+            loss_CE = NEC_loss_multilabel(y_hat_train, labels_batch_train)
             if args.coef_contra_loss > 0:
                 # y_representation = torch.cat([y_representation.unsqueeze(1), y_representation.unsqueeze(1)], dim=1)
                 # y_representation = torch.cat([y_representation.unsqueeze(1),
@@ -214,7 +251,7 @@ if args.mode == 'train':
                 # loss_SCL = criterion_SCL(y_representation, labels_batch_train)
                 loss_SCL = criterion_SCL_multilabel (criterion_SCL, y_representation, labels_batch_train)
                 # loss = criterion(y_hat_train.chunk(2, dim=0)[0], labels_batch_train) + args.coef_contra_loss * loss_SCL
-                loss = loss_CE + args.coef_contra_loss * loss_SCL
+                loss = (1-args.coef_contra_loss) * loss_CE + args.coef_contra_loss * loss_SCL
             else:
                 loss = loss_CE  # criterion(y_hat_train, labels_batch_train) #
             loss.backward()
@@ -246,12 +283,15 @@ if args.mode == 'train':
                 bsz = labels_batch_val.shape[0]
 
                 y_hat_val, _ = model(X_batch_val)
-                val_loss_batch = criterion(y_hat_val, labels_batch_val).item()
+                # val_loss_batch = criterion(y_hat_val, labels_batch_val).item()
+                val_loss_batch = NEC_loss_multilabel(y_hat_val, labels_batch_val).item()
+
                 val_losses_batch.append(val_loss_batch)
                 # predicted labels
                 # p_batch_val, _ = predict_labels(y_hat_val)
                 # predicted_prob_val.append(p_batch_val)
-                predicted_prob_val.append(y_hat_val)
+                p_batch_val = y_hat_val.chunk(2, dim=1)[0]
+                predicted_prob_val.append(p_batch_val)
                 true_labels_val.append(labels_batch_val)
 
             validation_loss = np.mean(val_losses_batch)
@@ -261,7 +301,13 @@ if args.mode == 'train':
             true_labels_val = torch.cat(true_labels_val, dim=0)
             predicted_prob_val_pos = (predicted_prob_val.cpu().detach().numpy())
             true_labels_val = true_labels_val.cpu().detach().numpy()
-            val_result = metrics.print_metrics_multilabel(true_labels_val, predicted_prob_val_pos, verbose=0)
+            try:
+                val_result = metrics.print_metrics_multilabel(true_labels_val, predicted_prob_val_pos, verbose=0)
+            except ValueError:
+                val_result = {"auc_scores": None,
+                              "ave_auc_micro": None,
+                              "ave_auc_macro": None,
+                              "ave_auc_weighted": None}
             validation_results.append(val_result)
             model.train()
 
@@ -279,7 +325,7 @@ if args.mode == 'train':
             model_final_name = model.say_name()
             path = os.path.join('pytorch_states/' + model_final_name
                                 + '.bs{}.epoch{}.trainLos{:.3f}'
-                                  '.Val-CoefCL{}.Los{:.3f}.AUCmic{:.3f}.AUCmac{:.4f}.AUCwei{:.4f}.pt'.
+                                  '.Val-NEC+SCL-bias0-CoefCL{}.Los{:.3f}.AUCmic{:.3f}.AUCmac{:.4f}.AUCwei{:.4f}.pt'.
                                 format(args.batch_size, epoch, training_loss,
                                        "{:.3f}".format(args.coef_contra_loss) if args.coef_contra_loss != 0 else "0",
                                        validation_loss,
@@ -313,7 +359,7 @@ if args.mode == 'train':
         ax = pdr.plot.line()
         plt.grid()
         fig = ax.get_figure()
-        plt.ylim((0.7, 0.8))
+        plt.ylim((0.7, 0.85))
         plt.show()
         fig.savefig(path + '.png')
         fig.savefig(path + '.pdf')
@@ -368,7 +414,9 @@ elif args.mode == 'test':
             x_pack = rnn_utils.pack_padded_sequence(x, x_length, batch_first=True)
 
             pred, _ = model(x_pack)
-            predictions.append(pred)
+            # a,b=pred.chunk(2, dim=1)
+            # predictions.append(a*(1-b))
+            predictions.append(pred.chunk(2, dim=1)[0])
             labels.append(y)
             names += list(cur_names)
             ts += list(cur_ts)
