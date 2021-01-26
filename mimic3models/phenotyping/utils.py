@@ -2,11 +2,13 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import numpy as np
-
-from mimic3models import common_utils
+from mimic3models import common_utils, metrics
 import threading
 import random
 import os
+import itertools
+import pandas as pd
+
 
 
 class BatchGen(object):
@@ -122,3 +124,25 @@ def save_results(names, ts, predictions, labels, path):
             line += [str(a) for a in y]
             line = ",".join(line)
             f.write(line + '\n')
+
+
+def generate_grid_search_BCE_cmd():
+    v_a = [0, 0.001,  0.002,
+           0.003,  0.004,
+           0.005, 0.006, 0.007,
+           0.008, 0.009, 0.01]
+    v_bs = [256, 512, 1024] #64, 128,
+    v_decay = [0, ]  #, 1e-5, 1e-4, 1e-3]  try to fix the effect of weight decay
+    with open('BCE.cmd', 'w') as f:
+        for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
+            cmd = "python main_BCE.py --network lstm  --dim 256 --timestep 1.0 --depth 1 --dropout 0.3 " \
+                  "--mode train --cuda --save_every 1 --epochs 50  " \
+                  "--coef_contra_loss {} --batch_size {} --weight_decay {} " \
+                  "2>&1 | tee log_BCE/BCE+SCL_cmd_a{}.bs{}.weDcy{}.log\n".format(a, bs, decay, a, bs, decay)
+            f.write(cmd)
+
+
+if __name__ == "__main__":
+
+    generate_grid_search_BCE_cmd()
+

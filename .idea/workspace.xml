@@ -5,11 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/mimic3models/phenotyping/main_BCE.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mimic3models/phenotyping/old_code/main_ph_nce_back_up.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mimic3models/phenotyping/BCE.cmd" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/phenotyping/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/phenotyping/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/pytorch_models/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/pytorch_models/losses.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mimic3models/phenotyping/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/phenotyping/utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -63,7 +61,7 @@
       <recent name="C:\Users\zangc\PycharmProjects\EHRCL\mimic3models\in_hospital_mortality\old_code" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.main_BCE-phe">
+  <component name="RunManager" selected="Python.utils-phe">
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -97,7 +95,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mimic3models/phenotyping/main_BCE.py" />
-      <option name="PARAMETERS" value="--network lstm  --dim 256 --timestep 1.0 --depth 1 --dropout 0.3 --mode train --batch_size 256   --coef_contra_loss 0.05  --cuda --epochs 10" />
+      <option name="PARAMETERS" value="--network lstm  --dim 256 --timestep 1.0 --depth 1 --dropout 0.3 --mode train --batch_size 512   --coef_contra_loss 0.  --cuda --epochs 50" />
       <option name="SHOW_COMMAND_LINE" value="true" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -162,20 +160,17 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="utils" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="utils-phe" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/mimic3models/phenotyping" />
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mimic3models/phenotyping/utils.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="true" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -187,17 +182,17 @@
     <list>
       <item itemvalue="Python.main_BCE" />
       <item itemvalue="Python.main_CBCE" />
-      <item itemvalue="Python.utils" />
       <item itemvalue="Python.main_MCE" />
       <item itemvalue="Python.main_BCE-phe" />
+      <item itemvalue="Python.utils-phe" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.utils-phe" />
         <item itemvalue="Python.main_BCE-phe" />
         <item itemvalue="Python.main_MCE" />
         <item itemvalue="Python.main_CBCE" />
         <item itemvalue="Python.main_BCE" />
-        <item itemvalue="Python.utils" />
       </list>
     </recent_temporary>
   </component>
@@ -220,7 +215,7 @@
       <workItem from="1611162810485" duration="5351000" />
       <workItem from="1611192679517" duration="23513000" />
       <workItem from="1611282830926" duration="1995000" />
-      <workItem from="1611370871141" duration="31140000" />
+      <workItem from="1611370871141" duration="34081000" />
     </task>
     <task id="LOCAL-00001" summary="not include pytorch states">
       <created>1608521605396</created>
@@ -383,7 +378,14 @@
       <option name="project" value="LOCAL" />
       <updated>1611613144429</updated>
     </task>
-    <option name="localTasksCounter" value="24" />
+    <task id="LOCAL-00024" summary="pyenotype main bce">
+      <created>1611635809728</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1611635809728</updated>
+    </task>
+    <option name="localTasksCounter" value="25" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -420,7 +422,8 @@
     <MESSAGE value="no weight decay, more alpha" />
     <MESSAGE value="MCE" />
     <MESSAGE value="boostrap" />
-    <option name="LAST_COMMIT_MESSAGE" value="boostrap" />
+    <MESSAGE value="pyenotype main bce" />
+    <option name="LAST_COMMIT_MESSAGE" value="pyenotype main bce" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
