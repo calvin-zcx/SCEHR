@@ -357,10 +357,10 @@ if args.mode == 'train':
     pdr = pd.DataFrame(data=r, index=range(1, len(validation_results)+1))
     ax = pdr.plot.line()
     ax.minorticks_on()
-    # ax.grid(which='minor') #, linestyle=':', linewidth='0.5', color='black')
+    ax.grid(which='minor', linestyle=':') #, linewidth='0.5', color='black')
     plt.grid()
     fig = ax.get_figure()
-    plt.ylim((0.75, 0.85))
+    plt.ylim((0.74, 0.85))
     plt.show()
     fig.savefig(path + '.png')
     # fig.savefig(path + '.pdf')
@@ -375,6 +375,7 @@ if args.mode == 'train':
     }
     pd_r_all = pd.DataFrame(data=r_all, index=range(1, len(validation_results) + 1))
     pd_r_all.to_csv(path+'.csv')
+    print('Dump', path + '[.png/.csv] done!')
 
 elif args.mode == 'test':
     print('Beginning testing...')
