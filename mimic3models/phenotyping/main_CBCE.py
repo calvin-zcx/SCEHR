@@ -37,7 +37,7 @@ parser.add_argument('--target_repl_coef', type=float, default=0.0)
 parser.add_argument('--data', type=str, help='Path to the data of phenotyping task',
                     default=os.path.join(os.path.dirname(__file__), '../../data/phenotyping/'))
 parser.add_argument('--output_dir', type=str, help='Directory relative which all output files are stored',
-                    default='.')
+                    default='./pytorch_states/CBCE/')
 # New added
 parser.add_argument('--seed', type=int, default=0,
                     help='Random seed manually for reproducibility.')
@@ -130,6 +130,13 @@ else:
             scl_loss = criterion_SCL_MultiLabel(representation, labels)
             loss = loss + alpha * scl_loss
         return loss
+
+    def get_probability_from_logits(wx):
+        y = torch.sigmoid(wx)
+        y_pos, y_neg = torch.chunk(y, 2, dim=1)
+        y_pos = y_pos / (y_pos + y_neg)
+        return y_pos
+
 
 # set lr and weight_decay later # or use other optimization say adamW later?
 optimizer = torch.optim.Adam(model.parameters(),  lr=args.lr, weight_decay=args.weight_decay)
@@ -245,7 +252,8 @@ if args.mode == 'train':
                 y_hat_val, y_representation_val = model(X_batch_val)
                 val_loss_batch = get_loss(y_hat_val, labels_batch_val, y_representation_val, args.coef_contra_loss)
                 val_losses_batch.append(val_loss_batch.item())
-                # predicted labels
+                # get predicted probability
+                y_hat_val = get_probability_from_logits(y_hat_val)
                 predicted_prob_val.append(y_hat_val)
                 true_labels_val.append(labels_batch_val)
 
@@ -283,6 +291,8 @@ if args.mode == 'train':
                 test_loss_batch = get_loss(y_hat_batch_test, y_batch_test, y_representation_test, args.coef_contra_loss)
                 test_losses_batch.append(test_loss_batch.item())
 
+                # get predicted probability
+                y_hat_batch_test = get_probability_from_logits(y_hat_batch_test)
                 predicted_prob_test.append(y_hat_batch_test)
                 true_labels_test.append(y_batch_test)
                 name_test.append(name_batch_test)
@@ -309,8 +319,8 @@ if args.mode == 'train':
         print("=" * 50)
 
         model_final_name = model.say_name()
-        path = os.path.join('pytorch_states/BCE/' + model_final_name
-                            + '.BCE+SCL.a{}.bs{}.wdcy{}.epo{}.'
+        path = os.path.join(args.output_dir + model_final_name
+                            + '.CBCE+SCL.a{}.bs{}.wdcy{}.epo{}.'
                               'Val-AucMac{:.4f}.AucMic{:.4f}.'
                               'Tst-AucMac{:.4f}.AucMic{:.4f}'.
                             format(args.coef_contra_loss, args.batch_size, args.weight_decay, epoch,
@@ -359,10 +369,10 @@ if args.mode == 'train':
     pdr = pd.DataFrame(data=r, index=range(1, len(validation_results)+1))
     ax = pdr.plot.line()
     ax.minorticks_on()
-    # ax.grid(which='minor') #, linestyle=':', linewidth='0.5', color='black')
+    ax.grid(which='minor', linestyle=':') #, linewidth='0.5', color='black')
     plt.grid()
     fig = ax.get_figure()
-    plt.ylim((0.75, 0.85))
+    plt.ylim((0.74, 0.85))
     plt.show()
     fig.savefig(path + '.png')
     # fig.savefig(path + '.pdf')
@@ -377,6 +387,7 @@ if args.mode == 'train':
     }
     pd_r_all = pd.DataFrame(data=r_all, index=range(1, len(validation_results) + 1))
     pd_r_all.to_csv(path+'.csv')
+    print('Dump', path + '[.png/.csv] done!')
 
 elif args.mode == 'test':
     print('Beginning testing...')
@@ -414,6 +425,7 @@ elif args.mode == 'test':
             x_pack = rnn_utils.pack_padded_sequence(x, x_length, batch_first=True)
 
             pred, _ = model(x_pack)
+            pred = get_probability_from_logits(pred)
             predictions.append(pred)
             labels.append(y)
             names += list(cur_names)

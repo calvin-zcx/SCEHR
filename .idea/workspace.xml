@@ -4,8 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="pyenotype main bce bce bash">
+    <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mimic3models/phenotyping/main_BCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/phenotyping/main_BCE.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mimic3models/phenotyping/main_CBCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/phenotyping/main_CBCE.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -59,7 +61,7 @@
       <recent name="C:\Users\zangc\PycharmProjects\EHRCL\mimic3models\in_hospital_mortality\old_code" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.utils-phe">
+  <component name="RunManager" selected="Python.main_CBCE-phe">
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -120,18 +122,18 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="main_CBCE" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="main_CBCE-phe" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="EHRCL" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/mimic3models/phenotyping" />
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" />
-      <option name="PARAMETERS" value="--network lstm --load_state pytorch_states/final_selected_linux/CBCE/LSTM.i76.h16.L2.c2.D0.3.CBCE+SCL.a0.0025.bs256.wdcy0.0.epo37.TrLos0.29.VaLos0.31.ACC0.886.ROC0.8543.PRC0.5485.TstACC0.897.ROC0.8599.PRC0.5042.pt --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode test --batch_size 200 --coef_contra_loss 0.0025" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mimic3models/phenotyping/main_CBCE.py" />
+      <option name="PARAMETERS" value="--network lstm  --dim 256 --timestep 1.0 --depth 1 --dropout 0.3 --mode train  --cuda --epochs 50  --batch_size 256   --coef_contra_loss 0." />
       <option name="SHOW_COMMAND_LINE" value="true" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -178,19 +180,19 @@
       <method v="2" />
     </configuration>
     <list>
-      <item itemvalue="Python.main_CBCE" />
       <item itemvalue="Python.main_MCE" />
       <item itemvalue="Python.main_BCE-phe" />
       <item itemvalue="Python.utils-phe" />
       <item itemvalue="Python.losses" />
+      <item itemvalue="Python.main_CBCE-phe" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.main_CBCE-phe" />
         <item itemvalue="Python.utils-phe" />
         <item itemvalue="Python.losses" />
         <item itemvalue="Python.main_BCE-phe" />
         <item itemvalue="Python.main_MCE" />
-        <item itemvalue="Python.main_CBCE" />
       </list>
     </recent_temporary>
   </component>
@@ -213,7 +215,7 @@
       <workItem from="1611162810485" duration="5351000" />
       <workItem from="1611192679517" duration="23513000" />
       <workItem from="1611282830926" duration="1995000" />
-      <workItem from="1611370871141" duration="46236000" />
+      <workItem from="1611370871141" duration="50023000" />
     </task>
     <task id="LOCAL-00001" summary="not include pytorch states">
       <created>1608521605396</created>
@@ -404,7 +406,14 @@
       <option name="project" value="LOCAL" />
       <updated>1611686143274</updated>
     </task>
-    <option name="localTasksCounter" value="28" />
+    <task id="LOCAL-00028" summary="pyenotype main bce bce bash">
+      <created>1611686413053</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1611686413053</updated>
+    </task>
+    <option name="localTasksCounter" value="29" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -526,6 +535,7 @@
     <SUITE FILE_PATH="coverage/EHRCL$utils.coverage" NAME="utils Coverage Results" MODIFIED="1611195647037" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
     <SUITE FILE_PATH="coverage/EHRCL$main_mort.coverage" NAME="main-mort Coverage Results" MODIFIED="1610074709263" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
     <SUITE FILE_PATH="coverage/EHRCL$main_CBCE.coverage" NAME="main_CBCE Coverage Results" MODIFIED="1611164132819" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
+    <SUITE FILE_PATH="coverage/EHRCL$main_CBCE_phe.coverage" NAME="main_CBCE-phe Coverage Results" MODIFIED="1611689171601" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/mimic3models/phenotyping" />
     <SUITE FILE_PATH="coverage/EHRCL$main_NCE.coverage" NAME="main_CBCE Coverage Results" MODIFIED="1610420703047" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
     <SUITE FILE_PATH="coverage/EHRCL$main_BCEwithlogit.coverage" NAME="main_BCEwithlogit Coverage Results" MODIFIED="1610424080613" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/mimic3models/in_hospital_mortality" />
     <SUITE FILE_PATH="coverage/EHRCL$main_BCE_phe.coverage" NAME="main_BCE-phe Coverage Results" MODIFIED="1611632785610" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/mimic3models/phenotyping" />
