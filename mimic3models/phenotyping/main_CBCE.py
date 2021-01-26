@@ -131,10 +131,11 @@ else:
             loss = loss + alpha * scl_loss
         return loss
 
-    def get_probability_from_logits(wx):
+    def get_probability_from_logits(wx, normalize=True):
         y = torch.sigmoid(wx)
         y_pos, y_neg = torch.chunk(y, 2, dim=1)
-        y_pos = y_pos / (y_pos + y_neg)
+        if normalize:
+            y_pos = y_pos / (y_pos + y_neg)
         return y_pos
 
 
@@ -213,8 +214,8 @@ if args.mode == 'train':
 
             optimizer.zero_grad()
 
-            X_batch_train = X_batch_train.float().to(device)
-            labels_batch_train = labels_batch_train.float().to(device)
+            X_batch_train = X_batch_train.to(device)
+            labels_batch_train = labels_batch_train.to(device)
             bsz = labels_batch_train.shape[0]
 
             y_hat_train, y_representation = model(X_batch_train)

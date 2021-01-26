@@ -273,6 +273,21 @@ def CBCE_WithLogitsLoss_multilabel(wx, y):
     return loss
 
 
+def CrossEntropy_multilabel(wx, y):
+    # wx: (bs, 2*C), before sigmoid
+    # y: (bs, C)
+    assert len(y.shape) == 2
+    losses = []
+    wx_pos, wx_neg = torch.chunk(wx, 2, dim=1)
+    C = wx_pos.shape[1]
+    for c in range(C):
+        ret = F.cross_entropy(torch.cat((wx_pos[:, c:c+1], wx_neg[:, c:c+1]), dim=1), y[:, c])
+        losses.append(ret)
+    loss = torch.mean(torch.stack(losses))
+    return loss
+
+
+
 # def criterion_SCL_multilabel(SCL, features, labels):
 #     assert len(labels.shape) == 2
 #     losses = []
@@ -325,3 +340,4 @@ def test_CBCE_multilabel_loss(n=5, c=2):
     l1 = CBCE_loss_multilabel(y_pre, y)
     l2 = CBCE_WithLogitsLoss_multilabel(wx, y)
     return l1, l2
+

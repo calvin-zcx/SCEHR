@@ -16,9 +16,10 @@ from mimic3models import common_utils
 import torch
 import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
-from torch.utils.data import DataLoader, Dataset, TensorDataset
+# from torch.utils.data import DataLoader, Dataset, TensorDataset
 from mimic3models.pytorch_models.lstm import LSTM_PT
-from mimic3models.pytorch_models.losses import SupConLoss_MultiLabel, SupNCELoss, CBCE_loss, CBCE_WithLogitsLoss
+from mimic3models.pytorch_models.losses import SupConLoss_MultiLabel, CrossEntropy_multilabel
+# SupNCELoss, CBCE_loss, CBCE_WithLogitsLoss
 from tqdm import tqdm
 from mimic3models.time_report import TimeReport
 from mimic3models.pytorch_models.torch_utils import Dataset, optimizer_to, model_summary, TimeDistributed, shuffle_within_labels,shuffle_time_dim
@@ -36,7 +37,7 @@ parser.add_argument('--target_repl_coef', type=float, default=0.0)
 parser.add_argument('--data', type=str, help='Path to the data of phenotyping task',
                     default=os.path.join(os.path.dirname(__file__), '../../data/phenotyping/'))
 parser.add_argument('--output_dir', type=str, help='Directory relative which all output files are stored',
-                    default='./pytorch_states/BCE/')
+                    default='./pytorch_states/MCE/')
 # New added
 parser.add_argument('--seed', type=int, default=0,
                     help='Random seed manually for reproducibility.')
@@ -107,8 +108,9 @@ print('Using device: ', device)
 
 # Build the model
 if args.network == "lstm":
-    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=25,
-                    dropout=args.dropout, target_repl=False, deep_supervision=False, task='ph')
+    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=25 * 2,
+                    dropout=args.dropout, target_repl=False, deep_supervision=False, task='ph',
+                    final_act=nn.Identity())
 else:
     raise NotImplementedError
 
@@ -116,18 +118,29 @@ else:
 if target_repl:
     raise NotImplementedError
 else:
-    criterion_BCE = nn.BCELoss()
+    # criterion_BCE = nn.BCELoss()
     criterion_SCL_MultiLabel = SupConLoss_MultiLabel(temperature=0.1)   # temperature=0.01)  # temperature=opt.temp
 
     def get_loss(y_pre, labels, representation, alpha=0):
         # CBCE_WithLogitsLoss is more numerically stable than CBCE_Loss when model is complex/overfitting
-        loss = criterion_BCE(y_pre, labels)
+        loss = CrossEntropy_multilabel(y_pre, labels)
         if alpha > 0:
             if len(representation.shape) == 2:
                 representation = representation.unsqueeze(1)
             scl_loss = criterion_SCL_MultiLabel(representation, labels)
             loss = loss + alpha * scl_loss
         return loss
+
+    def get_probability_from_logits(wx):
+        # wx: (bs, c*2)
+        wx_pos, wx_neg = torch.chunk(wx, 2, dim=1)
+        y = torch.softmax(
+            torch.cat((wx_pos.unsqueeze(1), wx_neg.unsqueeze(1)), dim=1),
+            dim=1)
+        y_pos, y_neg = torch.chunk(y, 2, dim=1)
+        y_pos, y_neg = y_pos.squeeze(), y_neg.squeeze()
+        return y_pos
+
 
 # set lr and weight_decay later # or use other optimization say adamW later?
 optimizer = torch.optim.Adam(model.parameters(),  lr=args.lr, weight_decay=args.weight_decay)
@@ -199,7 +212,7 @@ if args.mode == 'train':
             name_batch_train = ret["names"]
 
             X_batch_train = torch.tensor(X_batch_train, dtype=torch.float32)
-            labels_batch_train = torch.tensor(labels_batch_train, dtype=torch.float32)
+            labels_batch_train = torch.tensor(labels_batch_train, dtype=torch.long)
             X_batch_train = rnn_utils.pack_padded_sequence(X_batch_train, x_length, batch_first=True)
 
             optimizer.zero_grad()
@@ -233,7 +246,7 @@ if args.mode == 'train':
                 name_batch_val = ret["names"]
 
                 X_batch_val = torch.tensor(X_batch_val, dtype=torch.float32)
-                labels_batch_val = torch.tensor(labels_batch_val, dtype=torch.float32)
+                labels_batch_val = torch.tensor(labels_batch_val, dtype=torch.long)
                 X_batch_val = rnn_utils.pack_padded_sequence(X_batch_val, x_length, batch_first=True)
 
                 X_batch_val = X_batch_val.to(device)
@@ -243,7 +256,8 @@ if args.mode == 'train':
                 y_hat_val, y_representation_val = model(X_batch_val)
                 val_loss_batch = get_loss(y_hat_val, labels_batch_val, y_representation_val, args.coef_contra_loss)
                 val_losses_batch.append(val_loss_batch.item())
-                # predicted labels
+                # get predicted probability
+                y_hat_val = get_probability_from_logits(y_hat_val)
                 predicted_prob_val.append(y_hat_val)
                 true_labels_val.append(labels_batch_val)
 
@@ -270,7 +284,7 @@ if args.mode == 'train':
                 name_batch_test = ret["names"]
 
                 X_batch_test = torch.tensor(X_batch_test, dtype=torch.float32)
-                y_batch_test = torch.tensor(y_batch_test, dtype=torch.float32)
+                y_batch_test = torch.tensor(y_batch_test, dtype=torch.long)
                 X_batch_test = rnn_utils.pack_padded_sequence(X_batch_test, x_length, batch_first=True)
 
                 X_batch_test = X_batch_test.to(device)
@@ -281,6 +295,8 @@ if args.mode == 'train':
                 test_loss_batch = get_loss(y_hat_batch_test, y_batch_test, y_representation_test, args.coef_contra_loss)
                 test_losses_batch.append(test_loss_batch.item())
 
+                # get predicted probability
+                y_hat_batch_test = get_probability_from_logits(y_hat_batch_test)
                 predicted_prob_test.append(y_hat_batch_test)
                 true_labels_test.append(y_batch_test)
                 name_test.append(name_batch_test)
@@ -308,7 +324,7 @@ if args.mode == 'train':
 
         model_final_name = model.say_name()
         path = os.path.join(args.output_dir + model_final_name
-                            + '.BCE+SCL.a{}.bs{}.wdcy{}.epo{}.'
+                            + '.MCE+SCL.a{}.bs{}.wdcy{}.epo{}.'
                               'Val-AucMac{:.4f}.AucMic{:.4f}.'
                               'Tst-AucMac{:.4f}.AucMic{:.4f}'.
                             format(args.coef_contra_loss, args.batch_size, args.weight_decay, epoch,
@@ -409,10 +425,11 @@ elif args.mode == 'test':
             # x = np.array(x)
 
             x = torch.tensor(x, dtype=torch.float32)
-            y = torch.tensor(y, dtype=torch.float32)
+            y = torch.tensor(y, dtype=torch.long)
             x_pack = rnn_utils.pack_padded_sequence(x, x_length, batch_first=True)
 
             pred, _ = model(x_pack)
+            pred = get_probability_from_logits(pred)
             predictions.append(pred)
             labels.append(y)
             names += list(cur_names)
