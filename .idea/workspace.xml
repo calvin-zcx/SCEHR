@@ -4,11 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="cbce phenotype">
-      <change afterPath="$PROJECT_DIR$/mimic3models/phenotyping/main_MCE.py" afterDir="false" />
+    <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/phenotyping/main_BCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/phenotyping/main_BCE.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/phenotyping/main_CBCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/phenotyping/main_CBCE.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mimic3models/pytorch_models/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/pytorch_models/losses.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -154,7 +151,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mimic3models/phenotyping/main_MCE.py" />
-      <option name="PARAMETERS" value="--network lstm  --dim 256 --timestep 1.0 --depth 1 --dropout 0.3 --mode train  --cuda --epochs 50  --batch_size 256   --coef_contra_loss 0." />
+      <option name="PARAMETERS" value="--network lstm  --dim 256 --timestep 1.0 --depth 1 --dropout 0.3 --mode train  --cuda --epochs 50  --batch_size 256   --coef_contra_loss 0.001" />
       <option name="SHOW_COMMAND_LINE" value="true" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -217,7 +214,7 @@
       <workItem from="1611162810485" duration="5351000" />
       <workItem from="1611192679517" duration="23513000" />
       <workItem from="1611282830926" duration="1995000" />
-      <workItem from="1611370871141" duration="63525000" />
+      <workItem from="1611370871141" duration="68903000" />
     </task>
     <task id="LOCAL-00001" summary="not include pytorch states">
       <created>1608521605396</created>
@@ -422,7 +419,14 @@
       <option name="project" value="LOCAL" />
       <updated>1611690334593</updated>
     </task>
-    <option name="localTasksCounter" value="30" />
+    <task id="LOCAL-00030" summary=" phenotype mce">
+      <created>1611704491126</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1611704491126</updated>
+    </task>
+    <option name="localTasksCounter" value="31" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -462,7 +466,8 @@
     <MESSAGE value="pyenotype main bce" />
     <MESSAGE value="pyenotype main bce bce bash" />
     <MESSAGE value="cbce phenotype" />
-    <option name="LAST_COMMIT_MESSAGE" value="cbce phenotype" />
+    <MESSAGE value=" phenotype mce" />
+    <option name="LAST_COMMIT_MESSAGE" value=" phenotype mce" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

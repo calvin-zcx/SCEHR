@@ -281,7 +281,7 @@ def CrossEntropy_multilabel(wx, y):
     wx_pos, wx_neg = torch.chunk(wx, 2, dim=1)
     C = wx_pos.shape[1]
     for c in range(C):
-        ret = F.cross_entropy(torch.cat((wx_pos[:, c:c+1], wx_neg[:, c:c+1]), dim=1), y[:, c])
+        ret = F.cross_entropy(torch.cat((wx_neg[:, c:c+1], wx_pos[:, c:c+1]), dim=1), y[:, c])
         losses.append(ret)
     loss = torch.mean(torch.stack(losses))
     return loss
