@@ -49,7 +49,7 @@ class LSTM_PT(nn.Module):
         self.num_classes = num_classes  # 2, for binary classification using (softmax + ) cross entropy
         self.dropout = dropout  # 0.3
 
-        if final_act == None:
+        if final_act is None:
             # Set default activation
             if task in ['decomp', 'ihm', 'ph']:
                 self.final_activation = nn.Sigmoid()
