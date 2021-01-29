@@ -199,9 +199,9 @@ def generate_grid_search_MCE_cmd():
             if bs <= 256:
                 epoc = 50  # 60
             elif bs <= 512:
-                epoc = 70
+                epoc = 60
             else:
-                epoc = 80
+                epoc = 70
             cmd = "python main_MCE.py --network lstm  --dim 256 --timestep 1.0 --depth 1 --dropout 0.3 " \
                   "--mode train --cuda --save_every 1 --epochs {}  " \
                   "--batch_size {} --coef_contra_loss {} --weight_decay {} " \
