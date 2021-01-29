@@ -37,7 +37,7 @@ parser.add_argument('--target_repl_coef', type=float, default=0.0)
 parser.add_argument('--data', type=str, help='Path to the data of in-hospital mortality task',
                     default=os.path.join(os.path.dirname(__file__), '../../data/in-hospital-mortality/'))
 parser.add_argument('--output_dir', type=str, help='Directory relative which all output files are stored',
-                    default='./pytorch_states/BCE/')
+                    default='./pytorch_states/BCE_ds/')
 # New added
 parser.add_argument('--seed', type=int, default=0,
                     help='Random seed manually for reproducibility.')
@@ -71,6 +71,7 @@ target_repl = (args.target_repl_coef > 0.0 and args.mode == 'train')
 train_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'train'),
                                          listfile=os.path.join(args.data, 'train_listfile.csv'),
                                          period_length=48.0)
+utils.label_targed_downsample(train_reader, 0.05)
 
 val_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'train'),
                                        listfile=os.path.join(args.data, 'val_listfile.csv'),
@@ -333,7 +334,7 @@ if args.mode == 'train':
     ax = pdr.plot.line()
     plt.grid()
     fig = ax.get_figure()
-    plt.ylim((0.82, 0.87))
+    plt.ylim((0.81, 0.85))
     plt.show()
     fig.savefig(path + '.png')
     # fig.savefig(path + '.pdf')

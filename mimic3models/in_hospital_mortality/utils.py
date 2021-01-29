@@ -156,6 +156,36 @@ def boostrap_interval_and_std(y_pre, y_true,  n_bootstraps=100, path=None):
     return pd_r
 
 
+def label_targed_downsample(reader, targeted_ratio, label=1):
+    idx = []
+    N = len(reader._data)
+    for i in range(N):
+        if reader._data[i][1] == label:
+            idx.append(i)
+    n = len(idx)
+    ratio = n * 1.0 / N
+    print('original ratio: ', ratio)
+    print('targeted ratio: ', targeted_ratio)
+    assert targeted_ratio <= ratio
+    x = (n - targeted_ratio * N) / (1 - targeted_ratio)
+    drop = x / n
+    data = []
+    n_new = 0
+    for d in reader._data:
+        if d[1] == label:
+            if np.random.random_sample() < 1 - drop:
+                data.append(d)
+                n_new += 1
+        else:
+            data.append(d)
+    print('actual ration: ', 1.0*n_new / len(data))
+    reader._data = data
+    return data
+
+
+
+
+
 if __name__ == "__main__":
     # execute only if run as a script
     # generate_grid_search_CBCE_cmd()

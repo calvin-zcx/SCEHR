@@ -15,14 +15,14 @@ from mimic3models import metrics
 from mimic3models import common_utils
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset, TensorDataset
-# from torch.utils.data.dataset import random_split
-# from sklearn.model_selection import train_test_split
-from mimic3models.pytorch_models.lstm import LSTM_PT, predict_labels
+from torch.utils.data import DataLoader
+import torch.nn.functional as F
+
+from mimic3models.pytorch_models.lstm import LSTM_PT
 from mimic3models.pytorch_models.losses import SupConLoss, SupNCELoss, CBCE_loss, CBCE_WithLogitsLoss
 from tqdm import tqdm
 from mimic3models.time_report import TimeReport
-from mimic3models.pytorch_models.torch_utils import Dataset, optimizer_to, model_summary, TimeDistributed, shuffle_within_labels,shuffle_time_dim
+from mimic3models.pytorch_models.torch_utils import Dataset, optimizer_to, model_summary
 import matplotlib.pyplot as plt
 import pandas as pd
 import functools
@@ -37,7 +37,7 @@ parser.add_argument('--target_repl_coef', type=float, default=0.0)
 parser.add_argument('--data', type=str, help='Path to the data of in-hospital mortality task',
                     default=os.path.join(os.path.dirname(__file__), '../../data/in-hospital-mortality/'))
 parser.add_argument('--output_dir', type=str, help='Directory relative which all output files are stored',
-                    default='./pytorch_states/BCE/')
+                    default='./pytorch_states/MCE_ds/')
 # New added
 parser.add_argument('--seed', type=int, default=0,
                     help='Random seed manually for reproducibility.')
@@ -71,6 +71,9 @@ target_repl = (args.target_repl_coef > 0.0 and args.mode == 'train')
 train_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'train'),
                                          listfile=os.path.join(args.data, 'train_listfile.csv'),
                                          period_length=48.0)
+
+utils.label_targed_downsample(train_reader, 0.05)
+
 
 val_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'train'),
                                        listfile=os.path.join(args.data, 'val_listfile.csv'),
@@ -110,8 +113,9 @@ print('Using device: ', device)
 
 # Build the model
 if args.network == "lstm":
-    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=1,
-                    dropout=args.dropout, target_repl=False, deep_supervision=False, task='ihm')
+    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=2,
+                    dropout=args.dropout, target_repl=False, deep_supervision=False, task='ihm',
+                    final_act=nn.Identity())
 else:
     raise NotImplementedError
 
@@ -119,14 +123,14 @@ else:
 if target_repl:
     raise NotImplementedError
 else:
-    criterion_BCE = nn.BCELoss()
+    # criterion_BCE = nn.BCELoss()
     criterion_SCL = SupConLoss(temperature=0.1)   # temperature=0.01)  # temperature=opt.temp
     # criterion_SupNCE = SupNCELoss(temperature=1)
-    # criterion_MCE = nn.CrossEntropyLoss()
+    criterion_MCE = nn.CrossEntropyLoss()
 
     def get_loss(y_pre, labels, representation, alpha=0):
         # CBCE_WithLogitsLoss is more numerically stable than CBCE_Loss when model is complex/overfitting
-        loss = criterion_BCE(y_pre, labels)
+        loss = criterion_MCE(y_pre, labels)
         if alpha > 0:
             if labels.sum().item() < 2:
                 print('Warning: # positives < 2, NOT USING Supervised Contrastive Regularizer')
@@ -144,7 +148,6 @@ validation_losses = []
 validation_results = []
 test_results = []
 model_names = []
-
 # Load model weights # n_trained_chunks = 0
 start_from_epoch = 0
 if args.load_state != "":
@@ -183,7 +186,6 @@ if args.mode == 'train':
     train_dataset = Dataset(train_raw['data'][0], train_raw['data'][1], train_raw['names'])
     valid_dataset = Dataset(val_raw['data'][0], val_raw['data'][1], val_raw['names'])
     test_dataset = Dataset(test_raw['data'][0], test_raw['data'][1], test_raw['names'])
-    # np.array(train_raw['data'][1]).mean() # ratio of positive cases
 
     train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, drop_last=False, shuffle=True)
     val_loader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, drop_last=False, shuffle=False)
@@ -206,7 +208,7 @@ if args.mode == 'train':
         for i, (X_batch_train, labels_batch_train, name_batch_train) in enumerate(train_loader):
             optimizer.zero_grad()
             X_batch_train = X_batch_train.float().to(device)
-            labels_batch_train = labels_batch_train.float().to(device)
+            labels_batch_train = labels_batch_train.long().to(device)
             # bsz = labels_batch_train.shape[0]
             y_hat_train, y_representation = model(X_batch_train)
             loss = get_loss(y_hat_train, labels_batch_train, y_representation, args.coef_contra_loss)
@@ -229,12 +231,13 @@ if args.mode == 'train':
             true_labels_val = []
             for X_batch_val, labels_batch_val, name_batch_val in val_loader:
                 X_batch_val = X_batch_val.float().to(device)
-                labels_batch_val = labels_batch_val.float().to(device)
+                labels_batch_val = labels_batch_val.long().to(device)
                 y_hat_val, y_representation_val = model(X_batch_val)
                 val_loss_batch = get_loss(y_hat_val, labels_batch_val, y_representation_val, args.coef_contra_loss)
                 val_losses_batch.append(val_loss_batch.item())
                 # predicted labels
-                predicted_prob_val.append(y_hat_val)
+                y_hat_val = F.softmax(y_hat_val, dim=1)
+                predicted_prob_val.append(y_hat_val[:, 1])
                 true_labels_val.append(labels_batch_val)
 
             validation_loss = np.mean(val_losses_batch)
@@ -256,10 +259,10 @@ if args.mode == 'train':
             model.eval()
             for X_batch_test, y_batch_test, name_batch_test in test_loader:
                 X_batch_test = X_batch_test.float().to(device)
-                y_batch_test = y_batch_test.float().to(device)
+                y_batch_test = y_batch_test.long().to(device)
                 y_hat_batch_test, _ = model(X_batch_test)
-
-                predicted_prob_test.append(y_hat_batch_test)
+                y_hat_batch_test = F.softmax(y_hat_batch_test, dim=1)
+                predicted_prob_test.append(y_hat_batch_test[:, 1])
                 true_labels_test.append(y_batch_test)
                 name_test.append(name_batch_test)
 
@@ -284,7 +287,7 @@ if args.mode == 'train':
 
         model_final_name = model.say_name()
         path = os.path.join(args.output_dir + model_final_name
-                            + '.BCE+SCL.a{}.bs{}.wdcy{}.epo{}.TrLos{:.2f}.'
+                            + '.MCE+SCL.a{}.bs{}.wdcy{}.epo{}.TrLos{:.2f}.'
                               'VaLos{:.2f}.ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.'
                               'TstACC{:.3f}.ROC{:.4f}.PRC{:.4f}'.
                             format(args.coef_contra_loss, args.batch_size, args.weight_decay,
@@ -315,7 +318,6 @@ if args.mode == 'train':
                 'test_results': test_results,
                 'test_details': test_details,
             }, path+'.pt')
-
             # pd_test = pd.DataFrame(data=test_details)  # , index=range(1, len(validation_results) + 1))
             # pd_test.to_csv(path + '_[TEST].csv')
 
@@ -333,7 +335,7 @@ if args.mode == 'train':
     ax = pdr.plot.line()
     plt.grid()
     fig = ax.get_figure()
-    plt.ylim((0.82, 0.87))
+    plt.ylim((0.81, 0.85))
     plt.show()
     fig.savefig(path + '.png')
     # fig.savefig(path + '.pdf')
@@ -353,7 +355,6 @@ elif args.mode == 'test':
     print('Beginning testing...')
     start_time = time.time()
     boostrap = True
-
     # ensure that the code uses test_reader
     model.to(torch.device('cpu'))
 
@@ -375,21 +376,23 @@ elif args.mode == 'test':
         model.eval()
         for X_batch, y_batch, name_batch in tqdm(test_loader):
             X_batch = X_batch.float()
-            y_batch = y_batch.float()
+            y_batch = y_batch.long()
             y_hat_batch, _ = model(X_batch)
+            y_hat_batch = F.softmax(y_hat_batch, dim=1)
 
-            predicted_prob.append(y_hat_batch)
+            predicted_prob.append(y_hat_batch[:, 1])
             true_labels.append(y_batch)
             names.append(name_batch)
 
         predicted_prob = torch.cat(predicted_prob, dim=0)
-        true_labels = torch.cat(true_labels, dim=0) # with threshold 0.5, not used here
+        true_labels = torch.cat(true_labels, dim=0)  # with threshold 0.5, not used here
         names = np.concatenate(names)
 
     predictions = predicted_prob.cpu().detach().numpy()
     true_labels = true_labels.cpu().detach().numpy()
     test_results = metrics.print_metrics_binary(true_labels, predictions)
     print(test_results)
+
     print('Format print :.4f for results:')
 
     def format_print(dict):
@@ -401,10 +404,12 @@ elif args.mode == 'test':
         print("precision class 1 = {:.4f}".format(dict['prec1']))
         print("recall class 0 = {:.4f}".format(dict['rec0']))
         print("recall class 1 = {:.4f}".format(dict['rec1']))
+
     format_print(test_results)
 
     if boostrap:
         from utils import boostrap_interval_and_std
+
         pd_bst = boostrap_interval_and_std(predictions, true_labels, 100)
         pd.set_option('display.max_columns', None)
         pd.set_option("precision", 4)
