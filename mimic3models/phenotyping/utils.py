@@ -275,14 +275,19 @@ if __name__ == "__main__":
 
     # generate_grid_search_BCE_cmd()
     # generate_grid_search_CBCE_cmd()
-    generate_grid_search_MCE_cmd()
-    #
-    # summarize_results_from_csv_files(r'pytorch_states/BCE_Linux/')
-    # summarize_results_from_csv_files(r'pytorch_states/BCE_Linux/',
-    #                                  lambda x: ('.csv' in x) and ('BCE+SCL.a0.0.bs' in x),
-    #                                  r'pytorch_states/BCE_Linux_OnlyBCENoSCL_results.xlsx')
-    #
-    # summarize_results_from_csv_files(r'pytorch_states/CBCE_Linux/')
-    # summarize_results_from_csv_files(r'pytorch_states/CBCE_Linux/',
-    #                                  lambda x: ('.csv' in x) and ('CBCE+SCL.a0.0.bs' in x),
-    #                                  r'pytorch_states/CBCE_Linux_OnlyCBCENoSCL_results.xlsx')
+    # generate_grid_search_MCE_cmd()
+
+    summarize_results_from_csv_files(r'pytorch_states/BCE_Linux/')
+    summarize_results_from_csv_files(r'pytorch_states/BCE_Linux/',
+                                     lambda x: ('.csv' in x) and ('BCE+SCL.a0.0.bs' in x),
+                                     r'pytorch_states/BCE_Linux_OnlyBCENoSCL_results.xlsx')
+
+    summarize_results_from_csv_files(r'pytorch_states/CBCE_Linux/')
+    summarize_results_from_csv_files(r'pytorch_states/CBCE_Linux/',
+                                     lambda x: ('.csv' in x) and ('CBCE+SCL.a0.0.bs' in x),
+                                     r'pytorch_states/CBCE_Linux_OnlyCBCENoSCL_results.xlsx')
+
+    summarize_results_from_csv_files(r'pytorch_states/MCE_Linux/')
+    summarize_results_from_csv_files(r'pytorch_states/MCE_Linux/',
+                                     lambda x: ('.csv' in x) and ('MCE+SCL.a0.0.bs' in x),
+                                     r'pytorch_states/MCE_Linux_OnlyMCENoSCL_results.xlsx')

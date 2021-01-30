@@ -94,6 +94,30 @@ def generate_grid_search_MCE_cmd():
             f.write(cmd)
 
 
+def generate_grid_search_downsampling_cmd():
+    v_model = ['BCE', 'CBCE', 'MCE']
+    v_ds= [0.05, 0.01, 0.001]
+    v_a = [0, 0.0005, 0.001, 0.0015, 0.002,
+           0.0025, 0.003, 0.0035, 0.004, 0.0045,
+           0.005, 0.0055, 0.006, 0.0065, 0.007,
+           0.0075, 0.008, 0.0085, 0.009, 0.0095, 0.01]
+    v_bs = [128, 256, 512, 1024]
+
+    with open('downsample_all.cmd', 'w') as f:
+        for model, downsample, a, bs in itertools.product(v_model, v_ds, v_a, v_bs):
+            if bs <= 256:
+                epoc = 60  # 60
+            else:
+                epoc = 100
+            cmd = "python main_ds_{}.py --network lstm  --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 " \
+                  "--mode train --cuda --save_every 0  " \
+                  "--targeted_positive_ratio {} --coef_contra_loss {}  --batch_size {} --epochs {} " \
+                  "2>&1 | tee log_{}_ds/{}+SCL_cmd_ds{}.a{}.bs{}.log\n".format(
+                model,
+                downsample, a, bs,  epoc,
+                model, model, downsample, a, bs)
+            f.write(cmd)
+
 def summarize_results_from_csv_files(dir, f_cond=None, out_file=None):
     # pytorch_states/CBCE/
     if f_cond is None:
@@ -184,13 +208,14 @@ def label_targed_downsample(reader, targeted_ratio, label=1):
 
 
 
-
-
 if __name__ == "__main__":
+    generate_grid_search_downsampling_cmd()
+
+
     # execute only if run as a script
     # generate_grid_search_CBCE_cmd()
     # generate_grid_search_BCE_cmd()
-    generate_grid_search_MCE_cmd()
+    # generate_grid_search_MCE_cmd()
     # summarize_results_from_csv_files(r'pytorch_states/CBCE_Linux/')
     # summarize_results_from_csv_files(r'pytorch_states/BCE_Linux/')
     # summarize_results_from_csv_files(r'pytorch_states/BCE_Linux/',
@@ -198,8 +223,8 @@ if __name__ == "__main__":
     #                                  r'pytorch_states/BCE_Linux_OnlyBCENoSCL_results.xlsx')
     # summarize_results_from_csv_files(r'pytorch_states/CBCE_Linux/',
     #                                  lambda x: ('.csv' in x) and ('CBCE+SCL.a0.0.bs' in x),
-    #                                  r'pytorch_states/CBCE_Linux_OnlyCBCENoSCL_results.xlsx')
-    summarize_results_from_csv_files(r'pytorch_states/MCE_Linux/')
-    summarize_results_from_csv_files(r'pytorch_states/MCE_Linux/',
-                                     lambda x: ('.csv' in x) and ('MCE+SCL.a0.0.bs' in x),
-                                     r'pytorch_states/MCE_Linux_OnlyBCENoSCL_results.xlsx')
+    # #                                  r'pytorch_states/CBCE_Linux_OnlyCBCENoSCL_results.xlsx')
+    # summarize_results_from_csv_files(r'pytorch_states/MCE_Linux/')
+    # summarize_results_from_csv_files(r'pytorch_states/MCE_Linux/',
+    #                                  lambda x: ('.csv' in x) and ('MCE+SCL.a0.0.bs' in x),
+    #                                  r'pytorch_states/MCE_Linux_OnlyBCENoSCL_results.xlsx')

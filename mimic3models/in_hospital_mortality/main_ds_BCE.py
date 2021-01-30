@@ -48,7 +48,10 @@ parser.add_argument('--clip', type=float, default=0.25,
 parser.add_argument('--log_interval', type=int, default=50, metavar='N',
                     help='report interval')
 parser.add_argument('--coef_contra_loss', type=float, default=0, help='CE + coef * contrastive loss')
-parser.add_argument('--weight_decay', type=float, default=1e-5, help='weight_decay of adam')
+parser.add_argument('--weight_decay', type=float, default=0, help='weight_decay of adam')
+
+parser.add_argument('--targeted_positive_ratio', type=float, default=-1)
+
 args = parser.parse_args()
 print(args)
 
@@ -71,7 +74,9 @@ target_repl = (args.target_repl_coef > 0.0 and args.mode == 'train')
 train_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'train'),
                                          listfile=os.path.join(args.data, 'train_listfile.csv'),
                                          period_length=48.0)
-utils.label_targed_downsample(train_reader, 0.05)
+if args.targeted_positive_ratio > 0:
+    print('targeted_positive_ratio: ', args.targeted_positive_ratio)
+    utils.label_targed_downsample(train_reader, args.targeted_positive_ratio)
 
 val_reader = InHospitalMortalityReader(dataset_dir=os.path.join(args.data, 'train'),
                                        listfile=os.path.join(args.data, 'val_listfile.csv'),
