@@ -290,10 +290,11 @@ if args.mode == 'train':
 
         model_final_name = model.say_name()
         path = os.path.join(args.output_dir + model_final_name
-                            + '.BCE+SCL.a{}.bs{}.wdcy{}.epo{}.TrLos{:.2f}.'
+                            + '.BCE+SCL.prate{}.a{}.bs{}.wdcy{}.epo{}.TrLos{:.2f}.'
                               'VaLos{:.2f}.ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.'
                               'TstACC{:.3f}.ROC{:.4f}.PRC{:.4f}'.
-                            format(args.coef_contra_loss, args.batch_size, args.weight_decay,
+                            format(args.targeted_positive_ratio,
+                                   args.coef_contra_loss, args.batch_size, args.weight_decay,
                                    epoch, training_loss, validation_loss,
                                    val_result['acc'], val_result['auroc'], val_result['auprc'],
                                    test_result['acc'], test_result['auroc'], test_result['auprc']))
