@@ -339,7 +339,7 @@ if args.mode == 'train':
     ax = pdr.plot.line()
     plt.grid()
     fig = ax.get_figure()
-    plt.ylim((0.81, 0.85))
+    plt.ylim((0.79, 0.85))
     plt.show()
     fig.savefig(path + '.png')
     # fig.savefig(path + '.pdf')
