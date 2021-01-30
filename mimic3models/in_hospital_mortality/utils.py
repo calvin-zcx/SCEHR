@@ -112,7 +112,7 @@ def generate_grid_search_downsampling_cmd():
             cmd = "python main_ds_{}.py --network lstm  --dim 16 --timestep 1.0 --depth 2 --dropout 0.3 " \
                   "--mode train --cuda --save_every 0  " \
                   "--targeted_positive_ratio {} --coef_contra_loss {}  --batch_size {} --epochs {} " \
-                  "2>&1 | tee log_{}_ds/{}+SCL_cmd_ds{}.a{}.bs{}.log\n".format(
+                  "2>&1 | tee log_{}_ds/{}+SCL_cmd_prate{}.a{}.bs{}.log\n".format(
                 model,
                 downsample, a, bs,  epoc,
                 model, model, downsample, a, bs)
