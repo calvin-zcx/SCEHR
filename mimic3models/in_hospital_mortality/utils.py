@@ -70,10 +70,14 @@ def generate_grid_search_CBCE_nonorm_cmd():
     v_decay = [0, ]  #, 1e-5, 1e-4, 1e-3]  try to fix the effect of weight decay
     with open('CBCE_nonorm.cmd', 'w') as f:
         for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
+            if bs <= 256:
+                epoc = 60  # 60
+            else:
+                epoc = 100
             cmd = "python main_CBCE.py --output_dir pytorch_states/CBCE_nonorm/ --network lstm  " \
-                  "--dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --cuda --save_every 0 --epochs 100 " \
+                  "--dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --cuda --save_every 0 --epochs {} " \
                   "--coef_contra_loss {}  --batch_size {} --weight_decay {} " \
-                  "2>&1 | tee log_CBCE_nonorm/CBCE+SCL_bach_cmd_a{}.bs{}.weightDecay{}.log\n".format(a, bs, decay, a, bs, decay)
+                  "2>&1 | tee log_CBCE_nonorm/CBCE+SCL_bach_cmd_a{}.bs{}.weightDecay{}.log\n".format(epoc, a, bs, decay, a, bs, decay)
             f.write(cmd)
 
 

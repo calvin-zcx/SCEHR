@@ -5,9 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="15d5436c-0330-4b63-9126-68ba7622144d" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/embedding_plot.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/main_CBCE.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/CBCE_nonorm.cmd" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/CBCE_nonorm.cmd" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -227,7 +226,7 @@
       <workItem from="1611282830926" duration="1995000" />
       <workItem from="1611370871141" duration="106652000" />
       <workItem from="1611942966616" duration="14009000" />
-      <workItem from="1612128641293" duration="8751000" />
+      <workItem from="1612128641293" duration="9487000" />
     </task>
     <task id="LOCAL-00001" summary="not include pytorch states">
       <created>1608521605396</created>
@@ -502,7 +501,14 @@
       <option name="project" value="LOCAL" />
       <updated>1611979985118</updated>
     </task>
-    <option name="localTasksCounter" value="40" />
+    <task id="LOCAL-00040" summary=" # representation = F.normalize(last_time_step, dim=1)&#10;representation = last_time_step&#10;for test this exp only,">
+      <created>1612144990657</created>
+      <option name="number" value="00040" />
+      <option name="presentableId" value="LOCAL-00040" />
+      <option name="project" value="LOCAL" />
+      <updated>1612144990657</updated>
+    </task>
+    <option name="localTasksCounter" value="41" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -521,7 +527,6 @@
     <option name="oldMeFiltersMigrated" value="true" />
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="no data" />
     <MESSAGE value="labels in dataloader, possible be shuffled" />
     <MESSAGE value="update" />
     <MESSAGE value="update phenotyping" />
@@ -546,7 +551,8 @@
     <MESSAGE value="128 replace 1024 batch size" />
     <MESSAGE value="downsample exp" />
     <MESSAGE value=".prate{}" />
-    <option name="LAST_COMMIT_MESSAGE" value=".prate{}" />
+    <MESSAGE value=" # representation = F.normalize(last_time_step, dim=1)&#10;representation = last_time_step&#10;for test this exp only," />
+    <option name="LAST_COMMIT_MESSAGE" value=" # representation = F.normalize(last_time_step, dim=1)&#10;representation = last_time_step&#10;for test this exp only," />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -633,12 +639,12 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py</url>
-          <line>198</line>
+          <line>204</line>
           <option name="timeStamp" value="117" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py</url>
-          <line>202</line>
+          <line>208</line>
           <option name="timeStamp" value="118" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -648,7 +654,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/mimic3models/in_hospital_mortality/utils.py</url>
-          <line>140</line>
+          <line>146</line>
           <option name="timeStamp" value="122" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
