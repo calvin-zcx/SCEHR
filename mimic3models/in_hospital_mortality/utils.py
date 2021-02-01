@@ -81,6 +81,25 @@ def generate_grid_search_CBCE_nonorm_cmd():
             f.write(cmd)
 
 
+def generate_grid_search_CBCE_head_cmd():
+    v_a = [0, 0.0005, 0.001, 0.0015, 0.002,
+           0.0025, 0.003, 0.0035, 0.004, 0.0045,
+           0.005, 0.0055, 0.006, 0.0065, 0.007,
+           0.0075, 0.008, 0.0085, 0.009, 0.0095, 0.01]
+    v_bs = [64, 128, 256, 512, 1024]
+    v_decay = [0, ]  #, 1e-5, 1e-4, 1e-3]  try to fix the effect of weight decay
+    with open('CBCE_head.cmd', 'w') as f:
+        for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
+            if bs <= 256:
+                epoc = 60  # 60
+            else:
+                epoc = 100
+            cmd = "python main_CBCE.py --output_dir pytorch_states/CBCE_head/ --network lstm  " \
+                  "--dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --cuda --save_every 0 --epochs {} " \
+                  "--coef_contra_loss {}  --batch_size {} --weight_decay {} " \
+                  "2>&1 | tee log_CBCE_head/CBCE+SCL_bach_cmd_a{}.bs{}.weightDecay{}.log\n".format(epoc, a, bs, decay, a, bs, decay)
+            f.write(cmd)
+
 def generate_grid_search_BCE_cmd():
     v_a = [0, 0.0005, 0.001, 0.0015, 0.002,
            0.0025, 0.003, 0.0035, 0.004, 0.0045,
@@ -229,8 +248,8 @@ def label_targed_downsample(reader, targeted_ratio, label=1):
 
 
 if __name__ == "__main__":
-    generate_grid_search_CBCE_nonorm_cmd()
-
+    # generate_grid_search_CBCE_nonorm_cmd()
+    generate_grid_search_CBCE_head_cmd()
     # generate_grid_search_downsampling_cmd()
 
 
