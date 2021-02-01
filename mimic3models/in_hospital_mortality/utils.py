@@ -61,6 +61,22 @@ def generate_grid_search_CBCE_cmd():
             f.write(cmd)
 
 
+def generate_grid_search_CBCE_nonorm_cmd():
+    v_a = [0, 0.0005, 0.001, 0.0015, 0.002,
+           0.0025, 0.003, 0.0035, 0.004, 0.0045,
+           0.005, 0.0055, 0.006, 0.0065, 0.007,
+           0.0075, 0.008, 0.0085, 0.009, 0.0095, 0.01]
+    v_bs = [64, 128, 256, 512, 1024]
+    v_decay = [0, ]  #, 1e-5, 1e-4, 1e-3]  try to fix the effect of weight decay
+    with open('CBCE_nonorm.cmd', 'w') as f:
+        for a, bs, decay in itertools.product(v_a, v_bs, v_decay):
+            cmd = "python main_CBCE.py --output_dir pytorch_states/CBCE_nonorm/ --network lstm  " \
+                  "--dim 16 --timestep 1.0 --depth 2 --dropout 0.3 --mode train --cuda --save_every 0 --epochs 100 " \
+                  "--coef_contra_loss {}  --batch_size {} --weight_decay {} " \
+                  "2>&1 | tee log_CBCE_nonorm/CBCE+SCL_bach_cmd_a{}.bs{}.weightDecay{}.log\n".format(a, bs, decay, a, bs, decay)
+            f.write(cmd)
+
+
 def generate_grid_search_BCE_cmd():
     v_a = [0, 0.0005, 0.001, 0.0015, 0.002,
            0.0025, 0.003, 0.0035, 0.004, 0.0045,
@@ -209,7 +225,9 @@ def label_targed_downsample(reader, targeted_ratio, label=1):
 
 
 if __name__ == "__main__":
-    generate_grid_search_downsampling_cmd()
+    generate_grid_search_CBCE_nonorm_cmd()
+
+    # generate_grid_search_downsampling_cmd()
 
 
     # execute only if run as a script
@@ -228,3 +246,22 @@ if __name__ == "__main__":
     # summarize_results_from_csv_files(r'pytorch_states/MCE_Linux/',
     #                                  lambda x: ('.csv' in x) and ('MCE+SCL.a0.0.bs' in x),
     #                                  r'pytorch_states/MCE_Linux_OnlyBCENoSCL_results.xlsx')
+
+    # # change prate for different positive ratio attack results.
+    # # bare BCE
+    # prate = 0.001
+    # summarize_results_from_csv_files(r'pytorch_states/BCE_ds_Linux/',
+    #                                  lambda x: ('.csv' in x) and ('.BCE+SCL.prate{}.a0.0.'.format(prate) in x),
+    #                                  r'pytorch_states/BCE_ds_Linux.prate{}.a0.0.results.xlsx'.format(prate))
+    # # BCE + SCL
+    # summarize_results_from_csv_files(r'pytorch_states/BCE_ds_Linux/',
+    #                                  lambda x: ('.csv' in x) and ('.BCE+SCL.prate{}.a'.format(prate) in x),
+    #                                  r'pytorch_states/BCE_ds_Linux.prate{}.results.xlsx'.format(prate))
+    # # CBCE + SCL
+    # summarize_results_from_csv_files(r'pytorch_states/CBCE_ds_Linux/',
+    #                                  lambda x: ('.csv' in x) and ('.CBCE+SCL.prate{}.a'.format(prate) in x),
+    #                                  r'pytorch_states/CBCE_ds_Linux.prate{}.results.xlsx'.format(prate))
+    # # MCE + SCL
+    # summarize_results_from_csv_files(r'pytorch_states/MCE_ds_Linux/',
+    #                                  lambda x: ('.csv' in x) and ('.MCE+SCL.prate{}.a'.format(prate) in x),
+    #                                  r'pytorch_states/MCE_ds_Linux.prate{}.results.xlsx'.format(prate))

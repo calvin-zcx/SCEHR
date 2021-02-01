@@ -36,7 +36,7 @@ parser.add_argument('--target_repl_coef', type=float, default=0.0)
 parser.add_argument('--data', type=str, help='Path to the data of in-hospital mortality task',
                     default=os.path.join(os.path.dirname(__file__), '../../data/in-hospital-mortality/'))
 parser.add_argument('--output_dir', type=str, help='Directory relative which all output files are stored',
-                    default='.')
+                    default='pytorch_states/CBCE/')
 # New added
 parser.add_argument('--seed', type=int, default=0,
                     help='Random seed manually for reproducibility.')
@@ -285,7 +285,7 @@ if args.mode == 'train':
         print("=" * 50)
 
         model_final_name = model.say_name()
-        path = os.path.join('pytorch_states/CBCE/' + model_final_name
+        path = os.path.join(args.output_dir+ model_final_name
                             + '.CBCE+SCL.a{}.bs{}.wdcy{}.epo{}.TrLos{:.2f}.'
                               'VaLos{:.2f}.ACC{:.3f}.ROC{:.4f}.PRC{:.4f}.'
                               'TstACC{:.3f}.ROC{:.4f}.PRC{:.4f}'.
