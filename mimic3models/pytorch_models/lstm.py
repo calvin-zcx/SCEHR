@@ -128,11 +128,11 @@ class LSTM_PT(nn.Module):
             # y = Dense(num_classes, activation=final_activation)(L)
             # outputs = [y]
             self.output_linear = nn.Linear(self.hidden_dim, self.num_classes)  # , bias=False
-            self.head = nn.Sequential(
-                nn.Linear(self.hidden_dim, self.hidden_dim),
-                nn.ReLU(inplace=True),
-                nn.Linear(self.hidden_dim, self.hidden_dim)
-            )
+            # self.head = nn.Sequential(
+            #     nn.Linear(self.hidden_dim, self.hidden_dim),
+            #     nn.ReLU(inplace=True),
+            #     nn.Linear(self.hidden_dim, self.hidden_dim)
+            # )
 
         self.reset_parameters()
         # taking care of initialization problem later
@@ -186,8 +186,8 @@ class LSTM_PT(nn.Module):
             last_time_step = x[:, -1, :]  # (bs, hidden_dim=16) lstm_out[:,-1,:] for batch first or h_n[-1,:,:]
 
         last_time_step = self.output_dropout_layer(last_time_step)
-        # representation = F.normalize(last_time_step, dim=1)
-        representation = F.normalize(self.head(last_time_step), dim=1)
+        representation = F.normalize(last_time_step, dim=1)
+        # representation = F.normalize(self.head(last_time_step), dim=1)
         # representation = last_time_step
         # out = self.output_linear(representation)
         out = self.output_linear(last_time_step)  # (bs, 2)

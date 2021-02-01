@@ -269,27 +269,31 @@ format_print(test_results)
 
 
 # dim = embeddings.shape[1]
-emethod = 'pca' # "tsne"
-# tsne = TSNE(n_components=2, verbose=1, perplexity=100, n_iter=300)
-# tsne_results = tsne.fit_transform(embeddings)
+perplexity = 25 # 50
+emethod = "tsne" #'pca' #
+if emethod == 'tsne':
+    tsne = TSNE(n_components=2, verbose=1, perplexity=perplexity) #, n_iter=300)
+    results = tsne.fit_transform(embeddings)
+elif emethod == 'pca':
+    pca = PCA(n_components=2)
+    results = pca.fit_transform(embeddings)
 
-pca = PCA(n_components=2)
-tsne_results = pca.fit_transform(embeddings)
-
-df = pd.DataFrame(data={'y': true_labels,
-                        '{}-2d-one'.format(emethod): tsne_results[:, 0],
-                        '{}-2d-two'.format(emethod): tsne_results[:, 1]})
+df = pd.DataFrame(data={'y': true_labels.astype(int),
+                        '{}-Dim-1'.format(emethod): results[:, 0],
+                        '{}-Dim-2'.format(emethod): results[:, 1]})
+markers = ['o', 's', 'p', 'x', '^', '+', '*', '<', 'D', 'h', '>']
+markers = ['o',  'x']
 
 # plt.figure(figsize=(16, 10))
 ax = sns.scatterplot(
-    x="{}-2d-one".format(emethod),
-    y="{}-2d-two".format(emethod),
+    x="{}-Dim-1".format(emethod),
+    y="{}-Dim-2".format(emethod),
     hue="y",
-    # palette=sns.color_palette("hls", 10),
+    palette=sns.color_palette("hls", 2),
     data=df,
     legend="full",
-    alpha=0.3
-)
+    alpha=0.3,
+    style="y") #, s=30)
 
 fig = ax.get_figure()
 plt.show()
@@ -297,8 +301,8 @@ path = os.path.join(emethod, os.path.basename(args.load_state))
 dirname = os.path.dirname(path)
 if not os.path.exists(dirname):
     os.makedirs(dirname)
-fig.savefig(path + '.png')
-fig.savefig(path + '.pdf')
+fig.savefig(path + 'per{}.png'.format(perplexity))
+fig.savefig(path + 'per{}.pdf'.format(perplexity))
 # utils.save_results(names, predictions, true_labels, path)
 h_, m_, s_ = TimeReport._hms(time.time() - start_time)
 print('Testing elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))
