@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from mimic3models.pytorch_models.lstm import LSTM_PT
+from mimic3models.pytorch_models.lstm import LSTM_PT, LSTM_PT_v2
 from mimic3models.pytorch_models.losses import SupConLoss, SupNCELoss, CBCE_loss, CBCE_WithLogitsLoss
 from tqdm import tqdm
 from mimic3models.time_report import TimeReport
@@ -36,7 +36,7 @@ parser.add_argument('--target_repl_coef', type=float, default=0.0)
 parser.add_argument('--data', type=str, help='Path to the data of in-hospital mortality task',
                     default=os.path.join(os.path.dirname(__file__), '../../data/in-hospital-mortality/'))
 parser.add_argument('--output_dir', type=str, help='Directory relative which all output files are stored',
-                    default='pytorch_states/CBCE/')
+                    default='pytorch_states/CBCE_normlinear/')
 # New added
 parser.add_argument('--seed', type=int, default=0,
                     help='Random seed manually for reproducibility.')
@@ -109,7 +109,7 @@ print('Using device: ', device)
 
 # Build the model
 if args.network == "lstm":
-    model = LSTM_PT(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=2,
+    model = LSTM_PT_v2(input_dim=76, hidden_dim=args.dim, num_layers=args.depth, num_classes=2,
                     dropout=args.dropout, target_repl=False, deep_supervision=False, task='ihm',
                     final_act=nn.Identity())
 else:

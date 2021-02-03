@@ -269,10 +269,10 @@ format_print(test_results)
 
 
 # dim = embeddings.shape[1]
-perplexity = 25 # 50
-emethod = "tsne" #'pca' #
+perplexity = 50  # 35 # 25 #50 # 25 # 50
+emethod = 'tsne' #"tsne" #
 if emethod == 'tsne':
-    tsne = TSNE(n_components=2, verbose=1, perplexity=perplexity) #, n_iter=300)
+    tsne = TSNE(n_components=2, verbose=1, perplexity=perplexity, init='pca')  #, n_iter=300)
     results = tsne.fit_transform(embeddings)
 elif emethod == 'pca':
     pca = PCA(n_components=2)
@@ -289,7 +289,7 @@ ax = sns.scatterplot(
     x="{}-Dim-1".format(emethod),
     y="{}-Dim-2".format(emethod),
     hue="y",
-    palette=sns.color_palette("hls", 2),
+    # palette=sns.color_palette("hls", 2),
     data=df,
     legend="full",
     alpha=0.3,
@@ -301,8 +301,8 @@ path = os.path.join(emethod, os.path.basename(args.load_state))
 dirname = os.path.dirname(path)
 if not os.path.exists(dirname):
     os.makedirs(dirname)
-fig.savefig(path + 'per{}.png'.format(perplexity))
-fig.savefig(path + 'per{}.pdf'.format(perplexity))
+fig.savefig(path + 'per{}-pcainit.png'.format(perplexity))
+fig.savefig(path + 'per{}-pcainit.pdf'.format(perplexity))
 # utils.save_results(names, predictions, true_labels, path)
 h_, m_, s_ = TimeReport._hms(time.time() - start_time)
 print('Testing elapsed time: {:02d}h-{:02d}m-{:02d}s'.format(h_, m_, s_))
